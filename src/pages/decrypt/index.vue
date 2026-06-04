@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page" @tap="resetTimer">
     <!-- 解密区 -->
     <view class="card">
       <text class="card-label">粘贴密文</text>
@@ -57,14 +57,37 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { onHide, onShow } from '@dcloudio/uni-app'
+import { ref, watch } from 'vue'
+import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import { decrypt } from '@/utils/crypto'
 
 const ciphertext = ref('')
 const decryptedText = ref('')
 const resultShown = ref(false)
 const errorMsg = ref('')
+
+// 10秒无操作自动跳回计算器
+let timerId: ReturnType<typeof setTimeout> | null = null
+
+function resetTimer() {
+  if (timerId) clearTimeout(timerId)
+  timerId = setTimeout(() => {
+    uni.reLaunch({ url: '/pages/index/index' })
+  }, 10000)
+}
+
+function stopTimer() {
+  if (timerId) {
+    clearTimeout(timerId)
+    timerId = null
+  }
+}
+
+onShow(() => resetTimer())
+onHide(() => stopTimer())
+onUnload(() => stopTimer())
+
+watch(ciphertext, () => resetTimer())
 
 // 保存解密记录到本地存储
 function saveToHistory(text: string) {

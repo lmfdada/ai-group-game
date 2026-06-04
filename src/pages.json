@@ -3,6 +3,14 @@
 		{
 			"path": "pages/index/index",
 			"style": {
+				"navigationBarTitleText": "计算器",
+				"navigationBarBackgroundColor": "#0F0F1A",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/home/index",
+			"style": {
 				"navigationBarTitleText": "私密信使",
 				"navigationBarBackgroundColor": "#0F0F1A",
 				"navigationBarTextStyle": "white"
@@ -27,7 +35,7 @@
 	],
 	"globalStyle": {
 		"navigationBarTextStyle": "white",
-		"navigationBarTitleText": "私密信使",
+		"navigationBarTitleText": "计算器",
 		"navigationBarBackgroundColor": "#0F0F1A",
 		"backgroundColor": "#0F0F1A"
 	}

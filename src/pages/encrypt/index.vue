@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page" @tap="resetTimer">
     <!-- 加密区 -->
     <view class="card">
       <text class="card-label">输入秘密消息</text>
@@ -62,12 +62,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
 import { encrypt, getKeyPreview } from '@/utils/crypto'
 
 const plaintext = ref('')
 const ciphertext = ref('')
 const keyPreview = computed(() => getKeyPreview())
+
+// 10秒无操作自动跳回计算器
+let timerId: ReturnType<typeof setTimeout> | null = null
+
+function resetTimer() {
+  if (timerId) clearTimeout(timerId)
+  timerId = setTimeout(() => {
+    uni.reLaunch({ url: '/pages/index/index' })
+  }, 10000)
+}
+
+function stopTimer() {
+  if (timerId) {
+    clearTimeout(timerId)
+    timerId = null
+  }
+}
+
+onShow(() => resetTimer())
+onHide(() => stopTimer())
+onUnload(() => stopTimer())
+
+watch(plaintext, () => resetTimer())
 
 function handleEncrypt() {
   if (!plaintext.value.trim()) return

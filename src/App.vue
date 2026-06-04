@@ -18,7 +18,8 @@ onShow(() => {
 })
 
 onHide(() => {
-  console.log('[App] 小程序进入后台')
+  console.log('[App] 小程序进入后台，销毁所有消息和历史记录')
+  uni.removeStorageSync('decrypt-history')
 })
 </script>
 

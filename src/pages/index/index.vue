@@ -1,300 +1,322 @@
 <template>
-  <view class="page">
-    <!-- 头部 -->
-    <view class="header">
-      <text class="header-title">🔒 私密信使</text>
-      <text class="header-desc">纯本地加密，消息不上传任何服务器</text>
+  <view class="calc">
+    <!-- 显示区域 -->
+    <view class="display">
+      <text class="display-expr">{{ expression }}</text>
+      <text class="display-result" :class="{ 'result-small': result.length > 12 }">{{ result }}</text>
     </view>
 
-    <!-- 主操作区 -->
-    <view class="action-cards">
-      <view class="card" @tap="handleEncrypt">
-        <view class="card-icon card-icon-encrypt">
-          <text class="card-icon-text">🔐</text>
-        </view>
-        <view class="card-body">
-          <text class="card-title">加密消息</text>
-          <text class="card-desc">输入秘密 → 生成密文 → 发给好友</text>
-        </view>
-        <text class="card-arrow">→</text>
-      </view>
-
-      <view class="card" @tap="handleDecrypt">
-        <view class="card-icon card-icon-decrypt">
-          <text class="card-icon-text">🔓</text>
-        </view>
-        <view class="card-body">
-          <text class="card-title">解密消息</text>
-          <text class="card-desc">粘贴密文 → 解密查看 → 阅后即焚</text>
-        </view>
-        <text class="card-arrow">→</text>
-      </view>
-    </view>
-
-    <!-- 历史记录 -->
-    <view class="section-label">
-      <text class="section-label-text">最近解密</text>
-      <text class="section-label-clear" @tap="handleClearHistory">清空</text>
-    </view>
-
-    <view class="history-list">
+    <!-- 按键区域 -->
+    <view class="buttons">
       <view
-        v-for="(item, index) in history"
-        :key="index"
-        class="history-item"
-        @tap="handleViewHistory(item)"
+        v-for="btn in buttons"
+        :key="btn.key"
+        :class="[
+          'btn',
+          'btn--' + btn.type,
+          btn.blank ? 'btn--blank' : ''
+        ]"
+        @tap="handlePress(btn.key)"
       >
-        <view class="history-top">
-          <text class="history-time">{{ item.time }}</text>
-          <text class="history-badge">已焚毁</text>
-        </view>
-        <text class="history-preview">{{ item.preview }}</text>
+        <text v-if="!btn.blank">{{ btn.label }}</text>
       </view>
-
-      <view v-if="history.length === 0" class="empty">
-        <text class="empty-text">暂无解密记录</text>
-        <text class="empty-hint">解密后的消息阅后即焚，不留痕迹</text>
-      </view>
-    </view>
-
-    <!-- 安全提示 -->
-    <view class="footer-tip">
-      <text class="tip-text">⚠️ 请通过微信等加密渠道分享密文和密钥</text>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { ref, computed } from 'vue'
 
-interface HistoryItem {
-  time: string
-  preview: string
+const expression = ref('')
+const result = ref('0')
+const currentInput = ref('0')
+const operator = ref('')
+const prevValue = ref<number | null>(null)
+const justCalculated = ref(false)
+
+type BtnType = 'number' | 'operator' | 'func' | 'equals' | 'blank'
+
+interface ButtonConfig {
+  key: string
+  label: string
+  type: BtnType
+  blank?: boolean
 }
 
-const history = ref<HistoryItem[]>([])
+const buttons = computed<ButtonConfig[]>(() => [
+  { key: 'C', label: 'C', type: 'func' },
+  { key: '±', label: '±', type: 'func' },
+  { key: '%', label: '%', type: 'func' },
+  { key: '÷', label: '÷', type: 'operator' },
 
-function handleEncrypt() {
-  uni.navigateTo({ url: '/pages/encrypt/index' })
-}
+  { key: '7', label: '7', type: 'number' },
+  { key: '8', label: '8', type: 'number' },
+  { key: '9', label: '9', type: 'number' },
+  { key: '×', label: '×', type: 'operator' },
 
-function handleDecrypt() {
-  uni.navigateTo({ url: '/pages/decrypt/index' })
-}
+  { key: '4', label: '4', type: 'number' },
+  { key: '5', label: '5', type: 'number' },
+  { key: '6', label: '6', type: 'number' },
+  { key: '-', label: '-', type: 'operator' },
 
-function handleViewHistory(item: HistoryItem) {
-  uni.showModal({
-    title: item.time,
-    content: item.preview,
-    confirmText: '关闭'
-  })
-}
+  { key: '1', label: '1', type: 'number' },
+  { key: '2', label: '2', type: 'number' },
+  { key: '3', label: '3', type: 'number' },
+  { key: '+', label: '+', type: 'operator' },
 
-function handleClearHistory() {
-  if (history.value.length === 0) return
-  uni.showModal({
-    title: '确认清空',
-    content: '清空后无法恢复',
-    success: (res) => {
-      if (res.confirm) {
-        history.value = []
-        uni.setStorageSync('decrypt-history', [])
-        uni.showToast({ title: '已清空', icon: 'none' })
-      }
-    }
-  })
-}
+  { key: 'blank1', label: '', type: 'blank' },
+  { key: '0', label: '0', type: 'number' },
+  { key: '.', label: '.', type: 'number' },
+  { key: '=', label: '=', type: 'equals' },
+])
 
-// 页面显示时加载历史记录
-onShow(() => {
-  const saved = uni.getStorageSync('decrypt-history')
-  if (saved) {
-    history.value = saved
+function handlePress(key: string) {
+  if (key === 'C') {
+    clear()
+  } else if (key === '±') {
+    toggleSign()
+  } else if (key === '%') {
+    percent()
+  } else if (['+', '-', '×', '÷'].includes(key)) {
+    pressOperator(key)
+  } else if (key === '=') {
+    calculate()
+  } else if (key === '.') {
+    inputDot()
+  } else {
+    inputNumber(key)
   }
-})
+}
+
+function clear() {
+  expression.value = ''
+  result.value = '0'
+  currentInput.value = '0'
+  operator.value = ''
+  prevValue.value = null
+  justCalculated.value = false
+}
+
+function toggleSign() {
+  const num = parseFloat(currentInput.value)
+  if (num !== 0) {
+    currentInput.value = String(-num)
+    result.value = currentInput.value
+  }
+}
+
+function percent() {
+  const num = parseFloat(currentInput.value)
+  currentInput.value = String(num / 100)
+  result.value = currentInput.value
+}
+
+function inputNumber(key: string) {
+  if (justCalculated.value) {
+    clear()
+  }
+  if (currentInput.value === '0' && key !== '.') {
+    currentInput.value = key
+  } else {
+    currentInput.value += key
+  }
+  result.value = formatNumber(currentInput.value)
+}
+
+function inputDot() {
+  if (justCalculated.value) {
+    clear()
+  }
+  if (!currentInput.value.includes('.')) {
+    currentInput.value += '.'
+    result.value = currentInput.value
+  }
+}
+
+function pressOperator(op: string) {
+  if (operator.value && !justCalculated.value) {
+    calculate()
+  }
+  const num = parseFloat(currentInput.value)
+  prevValue.value = num
+  operator.value = op
+  justCalculated.value = false
+  currentInput.value = '0'
+  expression.value = formatNumber(String(num)) + ' ' + op
+}
+
+function getCurrentTimeNumber(): number {
+  const now = new Date()
+  return now.getHours() * 100 + now.getMinutes()
+}
+
+function checkTimeUnlock(input: string): boolean {
+  // 支持纯数字输入匹配当前时间（HHMM），例如 14:30 对应 1430
+  const num = parseInt(input, 10)
+  if (isNaN(num)) return false
+  return num === getCurrentTimeNumber()
+}
+
+function calculate() {
+  // 没有运算符的情况：纯数字输入，检测是否为时间解锁
+  if (!operator.value || prevValue.value === null) {
+    // console.debug 仅用于开发调试，发布版会移除
+    console.debug('[calc] checkTimeUnlock:', currentInput.value, 'target:', getCurrentTimeNumber())
+    if (checkTimeUnlock(currentInput.value)) {
+      expression.value = '验证通过'
+      result.value = '欢迎回来'
+      justCalculated.value = true
+      setTimeout(() => {
+        uni.reLaunch({ url: '/pages/home/index' })
+      }, 400)
+      return
+    }
+    return
+  }
+
+  const a = prevValue.value
+  const b = parseFloat(currentInput.value)
+  let calcResult = 0
+
+  switch (operator.value) {
+    case '+': calcResult = a + b; break
+    case '-': calcResult = a - b; break
+    case '×': calcResult = a * b; break
+    case '÷': calcResult = b !== 0 ? a / b : NaN; break
+  }
+
+  if (isNaN(calcResult) || !isFinite(calcResult)) {
+    expression.value = '错误'
+    result.value = '不能除以零'
+    operator.value = ''
+    prevValue.value = null
+    currentInput.value = '0'
+    justCalculated.value = true
+    return
+  }
+
+  expression.value = formatNumber(String(a)) + ' ' + operator.value + ' ' + formatNumber(String(b)) + ' ='
+  currentInput.value = String(calcResult)
+  result.value = formatNumber(currentInput.value)
+  operator.value = ''
+  prevValue.value = null
+  justCalculated.value = true
+
+  // 运算结果匹配时间也触发解锁
+  if (checkTimeUnlock(currentInput.value)) {
+    expression.value = '验证通过'
+    result.value = '欢迎回来'
+    justCalculated.value = true
+    setTimeout(() => {
+      uni.reLaunch({ url: '/pages/home/index' })
+    }, 400)
+  }
+}
+
+function formatNumber(str: string): string {
+  const num = parseFloat(str)
+  if (isNaN(num)) return '0'
+  if (Number.isInteger(num) && Math.abs(num) < 1e15) {
+    return String(num)
+  }
+  // 限制显示位数
+  if (String(num).length > 15) {
+    return num.toExponential(6)
+  }
+  return String(num)
+}
 </script>
 
 <style lang="scss">
-.page {
-  min-height: 100vh;
-  padding: 32rpx;
-  padding-bottom: 120rpx;
-}
-
-.header {
-  margin-bottom: 40rpx;
-}
-
-.header-title {
-  font-size: 44rpx;
-  font-weight: 700;
-  color: #FFFFFF;
-  display: block;
-  margin-bottom: 12rpx;
-}
-
-.header-desc {
-  font-size: 24rpx;
-  color: #666680;
-}
-
-.action-cards {
+.calc {
   display: flex;
   flex-direction: column;
-  gap: 20rpx;
-  margin-bottom: 48rpx;
+  height: 100vh;
+  background: #0F0F1A;
+  padding-bottom: 40rpx;
 }
 
-.card {
-  background: #1A1A2E;
-  border: 1px solid #2A2A3E;
-  border-radius: 20rpx;
-  padding: 32rpx;
+/* 显示区域 */
+.display {
+  flex: 1;
   display: flex;
-  align-items: center;
-  gap: 24rpx;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: 60rpx 40rpx 40rpx;
+  min-height: 280rpx;
 }
 
-.card:active {
-  opacity: 0.85;
-  border-color: #7B93FF;
+.display-expr {
+  font-size: 32rpx;
+  color: #666680;
+  margin-bottom: 16rpx;
+  word-break: break-all;
+  text-align: right;
+  width: 100%;
 }
 
-.card-icon {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 20rpx;
+.display-result {
+  font-size: 88rpx;
+  font-weight: 300;
+  color: #FFFFFF;
+  word-break: break-all;
+  text-align: right;
+  width: 100%;
+  line-height: 1.1;
+}
+
+.display-result.result-small {
+  font-size: 60rpx;
+}
+
+/* 按键区域 */
+.buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16rpx;
+  padding: 0 20rpx 20rpx;
+}
+
+.btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-}
-
-.card-icon-encrypt {
-  background: linear-gradient(135deg, #4F6EF7, #7B93FF);
-}
-
-.card-icon-decrypt {
-  background: linear-gradient(135deg, #00B42A, #47D764);
-}
-
-.card-icon-text {
+  height: 116rpx;
+  border-radius: 58rpx;
   font-size: 40rpx;
+  user-select: none;
 }
 
-.card-body {
-  flex: 1;
-  min-width: 0;
+.btn:active {
+  opacity: 0.7;
 }
 
-.card-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #FFFFFF;
-  display: block;
-  margin-bottom: 6rpx;
-}
-
-.card-desc {
-  font-size: 24rpx;
-  color: #888;
-}
-
-.card-arrow {
-  font-size: 32rpx;
-  color: #555;
-  flex-shrink: 0;
-}
-
-.section-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20rpx;
-}
-
-.section-label-text {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #FFFFFF;
-}
-
-.section-label-clear {
-  font-size: 24rpx;
-  color: #FF6B6B;
-}
-
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-}
-
-.history-item {
+.btn--number {
   background: #1A1A2E;
-  border: 1px solid #2A2A3E;
-  border-radius: 12rpx;
-  padding: 20rpx 24rpx;
+  color: #FFFFFF;
 }
 
-.history-item:active {
-  opacity: 0.85;
+.btn--operator {
+  background: #7B93FF;
+  color: #FFFFFF;
+  font-size: 44rpx;
 }
 
-.history-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8rpx;
+.btn--func {
+  background: #2A2A3E;
+  color: #FFFFFF;
+  font-size: 36rpx;
 }
 
-.history-time {
-  font-size: 22rpx;
-  color: #666680;
+.btn--equals {
+  background: #7B93FF;
+  color: #FFFFFF;
+  font-size: 44rpx;
 }
 
-.history-badge {
-  font-size: 20rpx;
-  color: #FF6B6B;
-  background: rgba(255, 107, 107, 0.1);
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
-}
-
-.history-preview {
-  font-size: 26rpx;
-  color: #AAA;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
-}
-
-.empty {
-  text-align: center;
-  padding: 64rpx 0;
-}
-
-.empty-text {
-  font-size: 28rpx;
-  color: #666680;
-  display: block;
-  margin-bottom: 8rpx;
-}
-
-.empty-hint {
-  font-size: 22rpx;
-  color: #444;
-}
-
-.footer-tip {
-  margin-top: 48rpx;
-  text-align: center;
-}
-
-.tip-text {
-  font-size: 22rpx;
-  color: #555;
+.btn--blank {
+  background: transparent;
+  pointer-events: none;
 }
 </style>

@@ -16,28 +16,28 @@ import CryptoJS from './crypto-js-lib.js'
 // 默认密钥 - 通过安全渠道分享给信任的好友
 const DEFAULT_KEY = 'pv-secret-d27654c2ec86daaa38d5547e9c4255c6'
 
+// 过期时间前缀标记和有效期（10分钟）
+const EXP_PREFIX = '__EXP__'
+const EXPIRY_MS = 10 * 60 * 1000
+
 /**
- * 加密文本
+ * 加密文本（含10分钟有效期）
  */
 export function encrypt(text: string, key?: string): string {
   const secretKey = key || DEFAULT_KEY
   try {
-    const result = CryptoJS.AES.encrypt(text, secretKey).toString()
-    // #region debug-point A:encrypt-success
-    ;(()=>{uni.request({url:"http://127.0.0.1:7777/event",method:"POST",data:{sessionId:"crypto-miniprogram-encrypt-fail",runId:"pre",hypothesisId:"A",location:"crypto.ts:encrypt",msg:"[DEBUG] encrypt success",data:{textLength:text.length,resultLength:result.length},ts:Date.now()}})})();
-    // #endregion
+    // 嵌入时间戳：__EXP__{timestamp}__{原文}
+    const payload = EXP_PREFIX + Date.now() + '__' + text
+    const result = CryptoJS.AES.encrypt(payload, secretKey).toString()
     return result
   } catch (e: any) {
-    // #region debug-point A:encrypt-error
-    ;(()=>{uni.request({url:"http://127.0.0.1:7777/event",method:"POST",data:{sessionId:"crypto-miniprogram-encrypt-fail",runId:"pre",hypothesisId:"A",location:"crypto.ts:encrypt-catch",msg:"[DEBUG] encrypt threw",data:{errorMessage:e?.message,errorStack:e?.stack,errorType:e?.constructor?.name,errorString:String(e)},ts:Date.now()}})})();
-    // #endregion
     throw e
   }
 }
 
 /**
  * 解密文本
- * 解密失败返回空字符串
+ * 解密失败或已过期返回空字符串
  */
 export function decrypt(ciphertext: string, key?: string): string {
   try {
@@ -45,6 +45,23 @@ export function decrypt(ciphertext: string, key?: string): string {
     const bytes = CryptoJS.AES.decrypt(ciphertext, secretKey)
     const result = bytes.toString(CryptoJS.enc.Utf8)
     if (!result) return ''
+
+    // 检查是否包含过期时间标记
+    if (result.startsWith(EXP_PREFIX)) {
+      const rest = result.slice(EXP_PREFIX.length) // "1717489200000__原文"
+      const sepIdx = rest.indexOf('__')
+      if (sepIdx > 0) {
+        const embedTime = parseInt(rest.slice(0, sepIdx), 10)
+        if (Date.now() - embedTime > EXPIRY_MS) {
+          console.warn('[Crypto] 密文已过期')
+          return ''
+        }
+        // 未过期，返回原文
+        return rest.slice(sepIdx + 2)
+      }
+    }
+
+    // 没有时间戳标记（旧版密文），直接返回
     return result
   } catch (e) {
     console.error('[Crypto] 解密失败:', e)
