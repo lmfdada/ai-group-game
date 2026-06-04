@@ -1,353 +1,300 @@
 <template>
   <view class="page">
-    <!-- 顶部品牌区 -->
-    <view class="hero">
-      <view class="hero-content">
-        <text class="hero-title">AI Group Game</text>
-        <text class="hero-subtitle">智能分组，快乐游戏</text>
-      </view>
+    <!-- 头部 -->
+    <view class="header">
+      <text class="header-title">🔒 私密信使</text>
+      <text class="header-desc">纯本地加密，消息不上传任何服务器</text>
     </view>
 
-    <!-- 功能入口卡片 -->
-    <view class="section">
-      <view class="section-title">
-        <text class="section-title-text">功能入口</text>
-      </view>
-      <view class="card-grid">
-        <view
-          v-for="item in features"
-          :key="item.id"
-          class="card"
-          hover-class="card-hover"
-          @tap="handleFeatureTap(item)"
-        >
-          <view class="card-icon" :style="{ backgroundColor: item.color }">
-            <text class="card-icon-text">{{ item.icon }}</text>
-          </view>
-          <text class="card-name">{{ item.name }}</text>
-          <text class="card-desc">{{ item.desc }}</text>
+    <!-- 主操作区 -->
+    <view class="action-cards">
+      <view class="card" @tap="handleEncrypt">
+        <view class="card-icon card-icon-encrypt">
+          <text class="card-icon-text">🔐</text>
         </view>
-      </view>
-    </view>
-
-    <!-- 最近活动 -->
-    <view class="section">
-      <view class="section-title">
-        <text class="section-title-text">最近活动</text>
-        <text class="section-more" @tap="handleMore">查看更多</text>
-      </view>
-      <view v-if="activities.length > 0" class="activity-list">
-        <view
-          v-for="item in activities"
-          :key="item.id"
-          class="activity-item"
-          hover-class="activity-hover"
-          @tap="handleActivityTap(item)"
-        >
-          <image
-            class="activity-img"
-            :src="item.image"
-            mode="aspectFill"
-          />
-          <view class="activity-info">
-            <text class="activity-name">{{ item.name }}</text>
-            <text class="activity-meta">{{ item.time }} · {{ item.players }}人参与</text>
-          </view>
+        <view class="card-body">
+          <text class="card-title">加密消息</text>
+          <text class="card-desc">输入秘密 → 生成密文 → 发给好友</text>
         </view>
+        <text class="card-arrow">→</text>
       </view>
-      <view v-else class="empty">
-        <text class="empty-text">暂无活动，快去创建一个吧</text>
+
+      <view class="card" @tap="handleDecrypt">
+        <view class="card-icon card-icon-decrypt">
+          <text class="card-icon-text">🔓</text>
+        </view>
+        <view class="card-body">
+          <text class="card-title">解密消息</text>
+          <text class="card-desc">粘贴密文 → 解密查看 → 阅后即焚</text>
+        </view>
+        <text class="card-arrow">→</text>
       </view>
     </view>
 
-    <!-- 底部操作按钮 -->
-    <view class="footer">
-      <button class="btn-primary" @tap="handleCreate">
-        <text class="btn-text">创建新活动</text>
-      </button>
+    <!-- 历史记录 -->
+    <view class="section-label">
+      <text class="section-label-text">最近解密</text>
+      <text class="section-label-clear" @tap="handleClearHistory">清空</text>
+    </view>
+
+    <view class="history-list">
+      <view
+        v-for="(item, index) in history"
+        :key="index"
+        class="history-item"
+        @tap="handleViewHistory(item)"
+      >
+        <view class="history-top">
+          <text class="history-time">{{ item.time }}</text>
+          <text class="history-badge">已焚毁</text>
+        </view>
+        <text class="history-preview">{{ item.preview }}</text>
+      </view>
+
+      <view v-if="history.length === 0" class="empty">
+        <text class="empty-text">暂无解密记录</text>
+        <text class="empty-hint">解密后的消息阅后即焚，不留痕迹</text>
+      </view>
+    </view>
+
+    <!-- 安全提示 -->
+    <view class="footer-tip">
+      <text class="tip-text">⚠️ 请通过微信等加密渠道分享密文和密钥</text>
     </view>
   </view>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue'
+<script setup lang="ts">
+import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 
-// 功能入口数据
-const features = ref([
-  {
-    id: 1,
-    name: '随机分组',
-    icon: '🎲',
-    color: '#4F6EF7',
-    desc: '智能均衡分组'
-  },
-  {
-    id: 2,
-    name: '组队匹配',
-    icon: '🤝',
-    color: '#FF7D00',
-    desc: '快速匹配队友'
-  },
-  {
-    id: 3,
-    name: '活动创建',
-    icon: '📋',
-    color: '#00B42A',
-    desc: '自定义游戏活动'
-  }
-])
+interface HistoryItem {
+  time: string
+  preview: string
+}
 
-// 最近活动数据
-const activities = ref([])
+const history = ref<HistoryItem[]>([])
 
-const fetchActivities = () => {
-  activities.value = [
-    {
-      id: 1,
-      name: '王者荣耀内战',
-      image: 'https://picsum.photos/id/160/300/200',
-      time: '2024-01-15',
-      players: 10
-    },
-    {
-      id: 2,
-      name: '狼人杀之夜',
-      image: 'https://picsum.photos/id/119/300/200',
-      time: '2024-01-14',
-      players: 12
-    },
-    {
-      id: 3,
-      name: '桌游大乱斗',
-      image: 'https://picsum.photos/id/201/300/200',
-      time: '2024-01-13',
-      players: 8
+function handleEncrypt() {
+  uni.navigateTo({ url: '/pages/encrypt/index' })
+}
+
+function handleDecrypt() {
+  uni.navigateTo({ url: '/pages/decrypt/index' })
+}
+
+function handleViewHistory(item: HistoryItem) {
+  uni.showModal({
+    title: item.time,
+    content: item.preview,
+    confirmText: '关闭'
+  })
+}
+
+function handleClearHistory() {
+  if (history.value.length === 0) return
+  uni.showModal({
+    title: '确认清空',
+    content: '清空后无法恢复',
+    success: (res) => {
+      if (res.confirm) {
+        history.value = []
+        uni.setStorageSync('decrypt-history', [])
+        uni.showToast({ title: '已清空', icon: 'none' })
+      }
     }
-  ]
-}
-
-const handleFeatureTap = (item) => {
-  uni.showToast({
-    title: `${item.name} - 开发中`,
-    icon: 'none'
   })
 }
 
-const handleActivityTap = (item) => {
-  uni.showToast({
-    title: item.name,
-    icon: 'none'
-  })
-}
-
-const handleMore = () => {
-  uni.showToast({
-    title: '功能开发中',
-    icon: 'none'
-  })
-}
-
-const handleCreate = () => {
-  uni.showToast({
-    title: '创建功能开发中',
-    icon: 'none'
-  })
-}
-
-onMounted(() => {
-  fetchActivities()
+// 页面显示时加载历史记录
+onShow(() => {
+  const saved = uni.getStorageSync('decrypt-history')
+  if (saved) {
+    history.value = saved
+  }
 })
 </script>
 
 <style lang="scss">
 .page {
   min-height: 100vh;
+  padding: 32rpx;
   padding-bottom: 120rpx;
 }
 
-.hero {
-  background: linear-gradient(135deg, #4F6EF7 0%, #7B93FF 100%);
-  padding: 64rpx 32rpx 80rpx;
-  border-radius: 0 0 32rpx 32rpx;
+.header {
+  margin-bottom: 40rpx;
 }
 
-.hero-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.hero-title {
-  font-size: 48rpx;
+.header-title {
+  font-size: 44rpx;
   font-weight: 700;
   color: #FFFFFF;
-  letter-spacing: 2rpx;
+  display: block;
+  margin-bottom: 12rpx;
 }
 
-.hero-subtitle {
-  font-size: 28rpx;
-  color: rgba(255, 255, 255, 0.85);
-  margin-top: 16rpx;
-}
-
-.section {
-  padding: 0 32rpx;
-  margin-top: 32rpx;
-}
-
-.section-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24rpx;
-}
-
-.section-title-text {
-  font-size: 34rpx;
-  font-weight: 600;
-  color: #1D2129;
-}
-
-.section-more {
+.header-desc {
   font-size: 24rpx;
-  color: #86909C;
+  color: #666680;
 }
 
-.card-grid {
+.action-cards {
   display: flex;
-  gap: 24rpx;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-bottom: 48rpx;
 }
 
 .card {
-  flex: 1;
-  background: #FFFFFF;
-  border-radius: 16rpx;
-  padding: 32rpx 24rpx;
+  background: #1A1A2E;
+  border: 1px solid #2A2A3E;
+  border-radius: 20rpx;
+  padding: 32rpx;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.08);
-  transition: all 0.2s;
+  gap: 24rpx;
 }
 
-.card-hover {
-  opacity: 0.9;
-  transform: scale(0.96);
+.card:active {
+  opacity: 0.85;
+  border-color: #7B93FF;
 }
 
 .card-icon {
   width: 88rpx;
   height: 88rpx;
-  border-radius: 50%;
+  border-radius: 20rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16rpx;
+  flex-shrink: 0;
+}
+
+.card-icon-encrypt {
+  background: linear-gradient(135deg, #4F6EF7, #7B93FF);
+}
+
+.card-icon-decrypt {
+  background: linear-gradient(135deg, #00B42A, #47D764);
 }
 
 .card-icon-text {
   font-size: 40rpx;
 }
 
-.card-name {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #1D2129;
-  margin-bottom: 8rpx;
+.card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+  display: block;
+  margin-bottom: 6rpx;
 }
 
 .card-desc {
-  font-size: 22rpx;
-  color: #86909C;
+  font-size: 24rpx;
+  color: #888;
 }
 
-.activity-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-
-.activity-item {
-  display: flex;
-  background: #FFFFFF;
-  border-radius: 16rpx;
-  overflow: hidden;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.08);
-}
-
-.activity-hover {
-  opacity: 0.95;
-}
-
-.activity-img {
-  width: 200rpx;
-  height: 160rpx;
+.card-arrow {
+  font-size: 32rpx;
+  color: #555;
   flex-shrink: 0;
 }
 
-.activity-info {
-  flex: 1;
-  padding: 24rpx;
+.section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.section-label-text {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.section-label-clear {
+  font-size: 24rpx;
+  color: #FF6B6B;
+}
+
+.history-list {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 12rpx;
 }
 
-.activity-name {
-  font-size: 30rpx;
-  font-weight: 500;
-  color: #1D2129;
-  margin-bottom: 12rpx;
+.history-item {
+  background: #1A1A2E;
+  border: 1px solid #2A2A3E;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
 }
 
-.activity-meta {
-  font-size: 24rpx;
-  color: #86909C;
+.history-item:active {
+  opacity: 0.85;
+}
+
+.history-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8rpx;
+}
+
+.history-time {
+  font-size: 22rpx;
+  color: #666680;
+}
+
+.history-badge {
+  font-size: 20rpx;
+  color: #FF6B6B;
+  background: rgba(255, 107, 107, 0.1);
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+}
+
+.history-preview {
+  font-size: 26rpx;
+  color: #AAA;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 .empty {
-  background: #FFFFFF;
-  border-radius: 16rpx;
-  padding: 64rpx 32rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.08);
+  text-align: center;
+  padding: 64rpx 0;
 }
 
 .empty-text {
   font-size: 28rpx;
-  color: #86909C;
+  color: #666680;
+  display: block;
+  margin-bottom: 8rpx;
 }
 
-.footer {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 16rpx 32rpx 32rpx;
-  background: linear-gradient(transparent, #F5F6FA 20%);
+.empty-hint {
+  font-size: 22rpx;
+  color: #444;
 }
 
-.btn-primary {
-  width: 100%;
-  height: 96rpx;
-  line-height: 96rpx;
-  background: linear-gradient(135deg, #4F6EF7 0%, #7B93FF 100%);
-  border: none;
-  border-radius: 48rpx;
-  color: #FFFFFF;
-  font-size: 32rpx;
-  font-weight: 500;
+.footer-tip {
+  margin-top: 48rpx;
   text-align: center;
-  box-shadow: 0 4rpx 20rpx rgba(79, 110, 247, 0.4);
 }
 
-.btn-primary:active {
-  opacity: 0.9;
-}
-
-.btn-text {
-  color: #FFFFFF;
+.tip-text {
+  font-size: 22rpx;
+  color: #555;
 }
 </style>

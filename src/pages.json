@@ -3,14 +3,32 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "AI Group Game"
+				"navigationBarTitleText": "私密信使",
+				"navigationBarBackgroundColor": "#0F0F1A",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/encrypt/index",
+			"style": {
+				"navigationBarTitleText": "加密消息",
+				"navigationBarBackgroundColor": "#0F0F1A",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/decrypt/index",
+			"style": {
+				"navigationBarTitleText": "解密消息",
+				"navigationBarBackgroundColor": "#0F0F1A",
+				"navigationBarTextStyle": "white"
 			}
 		}
 	],
 	"globalStyle": {
-		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "AI Group Game",
-		"navigationBarBackgroundColor": "#F8F8F8",
-		"backgroundColor": "#F8F8F8"
+		"navigationBarTextStyle": "white",
+		"navigationBarTitleText": "私密信使",
+		"navigationBarBackgroundColor": "#0F0F1A",
+		"backgroundColor": "#0F0F1A"
 	}
 }
