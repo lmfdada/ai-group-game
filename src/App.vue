@@ -5,10 +5,9 @@ onLaunch(() => {
   console.log('[App] 私密信使启动')
 
   // 所有入口强制导向计算器页面（微信搜索、扫码等场景）
-  // 分享卡片已配置为直接打开计算器页面，不受影响
   try {
     const enterOptions = uni.getEnterOptionsSync()
-    const entryPath = enterOptions?.path
+    const entryPath = (enterOptions?.path || '').replace(/^\//, '') // 去掉前导斜杠统一比较
     if (entryPath && entryPath !== 'pages/index/index') {
       console.debug('[App] 非计算器入口，强制重定向:', entryPath)
       // 保留 query 参数（如分享卡片携带的密文 ?c=）
@@ -21,9 +20,8 @@ onLaunch(() => {
           redirectUrl += '?' + qs
         }
       }
-      setTimeout(() => {
-        uni.reLaunch({ url: redirectUrl })
-      }, 0)
+      // 不需要 setTimeout，直接 reLaunch
+      uni.reLaunch({ url: redirectUrl })
     }
   } catch (e) {
     console.warn('[App] 获取入口参数失败:', e)
