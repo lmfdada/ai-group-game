@@ -4,29 +4,6 @@ import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
 onLaunch(() => {
   console.log('[App] 私密信使启动')
 
-  // 所有入口强制导向计算器页面（微信搜索、扫码等场景）
-  try {
-    const enterOptions = uni.getEnterOptionsSync()
-    const entryPath = (enterOptions?.path || '').replace(/^\//, '') // 去掉前导斜杠统一比较
-    if (entryPath && entryPath !== 'pages/index/index') {
-      console.debug('[App] 非计算器入口，强制重定向:', entryPath)
-      // 保留 query 参数（如分享卡片携带的密文 ?c=）
-      let redirectUrl = '/pages/index/index'
-      const query = enterOptions?.query
-      if (query && typeof query === 'object') {
-        const entries = Object.entries(query).filter(([, v]) => v !== undefined)
-        if (entries.length > 0) {
-          const qs = entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&')
-          redirectUrl += '?' + qs
-        }
-      }
-      // 不需要 setTimeout，直接 reLaunch
-      uni.reLaunch({ url: redirectUrl })
-    }
-  } catch (e) {
-    console.warn('[App] 获取入口参数失败:', e)
-  }
-
   // 启用防截屏/防录屏（仅微信小程序生效，不弹授权，能开就开，开不了拉倒）
   // #ifdef MP-WEIXIN
   try {

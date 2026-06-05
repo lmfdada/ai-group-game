@@ -35,8 +35,25 @@ const result = ref('0')
 const pendingCiphertext = ref('')
 
 onLoad((query) => {
+  // 从路由参数获取密文
   if (query?.c) {
     pendingCiphertext.value = query.c
+    console.debug('[calc] 从路由参数获取密文')
+  }
+  // 兜底：从入口参数获取（某些场景路由参数可能为空）
+  if (!pendingCiphertext.value) {
+    try {
+      const enterOptions = uni.getEnterOptionsSync()
+      if (enterOptions?.query?.c) {
+        pendingCiphertext.value = enterOptions.query.c as string
+        console.debug('[calc] 从入口参数获取密文')
+      }
+    } catch (e) {
+      // 静默
+    }
+  }
+  if (pendingCiphertext.value) {
+    console.debug('[calc] 已捕获密文参数，等待时间验证')
   }
 })
 const currentInput = ref('0')
