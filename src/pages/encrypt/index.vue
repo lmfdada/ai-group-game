@@ -1,5 +1,5 @@
 <template>
-  <view class="page" @tap="resetTimer">
+  <view class="page" @touchstart="resetTimer">
     <!-- 加密区 -->
     <view class="card">
       <text class="card-label">输入秘密消息</text>
@@ -37,7 +37,7 @@
         <button class="btn-copy" @tap="handleCopy">
           <text class="btn-copy-text">📋 复制密文</text>
         </button>
-        <button class="btn-share" @tap="handleShare">
+        <button class="btn-share" open-type="share">
           <text class="btn-share-text">💬 发送给好友</text>
         </button>
       </view>
@@ -63,7 +63,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
+import { onShow, onHide, onUnload, onShareAppMessage } from '@dcloudio/uni-app'
 import { encrypt, getKeyPreview } from '@/utils/crypto'
 
 const plaintext = ref('')
@@ -93,6 +93,35 @@ onUnload(() => stopTimer())
 
 watch(plaintext, () => resetTimer())
 
+// 京东商品风格的随机标题（混淆视听，避免暴露暗门）
+const JD_TITLES = [
+  '京东超市 休闲零食大礼包1000g',
+  ' Apple iPhone 16 Pro Max 256GB',
+  '京东超市 纯牛奶250ml×16盒',
+  '小米Redmi K80 5G手机 12+256G',
+  '良品铺子 坚果礼盒装8罐',
+  '华为MatePad SE 11英寸平板',
+  '三只松鼠 每日坚果750g/30袋',
+  '海尔 全自动滚筒洗衣机10kg',
+  '蒙牛 特仑苏纯牛奶250ml×12盒',
+  '联想ThinkPad X1 Carbon 2026款',
+]
+
+// 将密文转为 URL 安全的 base64url 格式（避免 + / = 等字符在分享链接中损坏）
+function toUrlSafe(base64: string) {
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+// 微信原生分享配置
+onShareAppMessage(() => {
+  const randomTitle = JD_TITLES[Math.floor(Math.random() * JD_TITLES.length)]
+  return {
+    title: randomTitle,
+    imageUrl: 'https://picsum.photos/400/300?random=' + Date.now(),
+    path: '/pages/index/index?c=' + toUrlSafe(ciphertext.value)
+  }
+})
+
 function handleEncrypt() {
   if (!plaintext.value.trim()) return
 
@@ -109,9 +138,6 @@ function handleEncrypt() {
       content: e?.message || '请检查控制台错误信息',
       showCancel: false
     })
-    // #region debug-point C:page-error
-    ;(()=>{uni.request({url:"http://127.0.0.1:7777/event",method:"POST",data:{sessionId:"crypto-miniprogram-encrypt-fail",runId:"pre",hypothesisId:"C",location:"encrypt.vue:catch",msg:"[DEBUG] page caught encrypt error",data:{message:e?.message,stack:e?.stack,type:e?.constructor?.name,full:String(e)},ts:Date.now()}})})();
-    // #endregion
   }
 }
 
@@ -125,20 +151,6 @@ function handleCopy() {
   })
 }
 
-function handleShare() {
-  if (!ciphertext.value) return
-  // 复制后引导用户去微信粘贴
-  uni.setClipboardData({
-    data: ciphertext.value,
-    success: () => {
-      uni.showModal({
-        title: '密文已复制',
-        content: '现在打开微信，粘贴密文发给好友。\n\n别忘了同时把密钥告诉对方！',
-        confirmText: '知道了'
-      })
-    }
-  })
-}
 </script>
 
 <style lang="scss">
@@ -319,4 +331,5 @@ function handleShare() {
   font-family: monospace;
   font-size: 22rpx;
 }
+
 </style>

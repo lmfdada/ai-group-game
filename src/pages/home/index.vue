@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page" @touchstart="resetTimer">
     <!-- 头部 -->
     <view class="header">
       <text class="header-title">私密信使</text>
@@ -66,7 +66,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
 
 interface HistoryItem {
   time: string
@@ -74,6 +74,33 @@ interface HistoryItem {
 }
 
 const history = ref<HistoryItem[]>([])
+
+// 10秒无操作自动跳回计算器
+let timerId: ReturnType<typeof setTimeout> | null = null
+
+function resetTimer() {
+  if (timerId) clearTimeout(timerId)
+  timerId = setTimeout(() => {
+    uni.reLaunch({ url: '/pages/index/index' })
+  }, 10000)
+}
+
+function stopTimer() {
+  if (timerId) {
+    clearTimeout(timerId)
+    timerId = null
+  }
+}
+
+onShow(() => {
+  resetTimer()
+  const saved = uni.getStorageSync('decrypt-history')
+  if (saved) {
+    history.value = saved
+  }
+})
+onHide(() => stopTimer())
+onUnload(() => stopTimer())
 
 function handleEncrypt() {
   uni.navigateTo({ url: '/pages/encrypt/index' })
@@ -106,12 +133,6 @@ function handleClearHistory() {
   })
 }
 
-onShow(() => {
-  const saved = uni.getStorageSync('decrypt-history')
-  if (saved) {
-    history.value = saved
-  }
-})
 </script>
 
 <style lang="scss">

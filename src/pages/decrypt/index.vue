@@ -1,5 +1,5 @@
 <template>
-  <view class="page" @tap="resetTimer">
+  <view class="page" @touchstart="resetTimer">
     <!-- 解密区 -->
     <view class="card">
       <text class="card-label">粘贴密文</text>
@@ -8,7 +8,7 @@
         v-model="ciphertext"
         placeholder="粘贴好友发来的密文..."
         placeholder-class="placeholder"
-        :maxlength="5000"
+        :maxlength="-1"
         auto-height
       />
       <text class="card-hint">将好友发来的密文完整粘贴到上方</text>
@@ -53,18 +53,26 @@
       <text class="tips-item">• 关闭本页后消息自动销毁</text>
       <text class="tips-item">• 如需重新查看，请让好友重新发送密文</text>
     </view>
+
+    <!-- 隐私遮罩：切到后台时覆盖内容，防止 app switcher 截图 -->
+    <view v-if="showPrivacyCover" class="privacy-cover">
+      <text class="privacy-cover-text">离开即焚 · 保护隐私</text>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { onShow, onHide, onUnload } from '@dcloudio/uni-app'
+import { onShow, onHide, onUnload, onLoad } from '@dcloudio/uni-app'
 import { decrypt } from '@/utils/crypto'
 
 const ciphertext = ref('')
 const decryptedText = ref('')
 const resultShown = ref(false)
 const errorMsg = ref('')
+
+// 隐私遮罩：切到后台时覆盖内容
+const showPrivacyCover = ref(false)
 
 // 10秒无操作自动跳回计算器
 let timerId: ReturnType<typeof setTimeout> | null = null
@@ -83,9 +91,70 @@ function stopTimer() {
   }
 }
 
-onShow(() => resetTimer())
-onHide(() => stopTimer())
-onUnload(() => stopTimer())
+// 截图销毁回调（保存引用以便移除监听）
+const screenshotHandler = () => {
+  if (resultShown.value || errorMsg.value) {
+    ciphertext.value = ''
+    decryptedText.value = ''
+    resultShown.value = false
+    errorMsg.value = ''
+  }
+}
+
+onShow(() => {
+  resetTimer()
+  // 回到前台时隐藏隐私遮罩
+  showPrivacyCover.value = false
+  // 注册截图监听：检测到截图就销毁消息
+  try {
+    uni.onUserCaptureScreen(screenshotHandler)
+  } catch (e) {
+    // 静默忽略
+  }
+})
+
+onHide(() => {
+  stopTimer()
+  // 切到后台时显示隐私遮罩，防止 app switcher 截图
+  showPrivacyCover.value = true
+  // 取消截图监听
+  try {
+    uni.offUserCaptureScreen(screenshotHandler)
+  } catch (e) {
+    // 静默忽略
+  }
+  if (resultShown.value || errorMsg.value) {
+    ciphertext.value = ''
+    decryptedText.value = ''
+    resultShown.value = false
+    errorMsg.value = ''
+  }
+})
+
+onUnload(() => {
+  stopTimer()
+  try {
+    uni.offUserCaptureScreen(screenshotHandler)
+  } catch (e) {
+    // 静默忽略
+  }
+})
+
+// 将 base64url 还原为标准 base64
+function fromUrlSafe(s: string) {
+  let result = s.replace(/-/g, '+').replace(/_/g, '/')
+  while (result.length % 4) result += '='
+  return result
+}
+
+// 接收来自分享的密文参数（好友通过小程序卡片打开）
+onLoad((query) => {
+  if (query?.c) {
+    ciphertext.value = fromUrlSafe(query.c)
+    // 自动执行解密
+    handleDecrypt()
+  }
+})
 
 watch(ciphertext, () => resetTimer())
 
@@ -132,26 +201,8 @@ function handleBurn() {
   decryptedText.value = ''
   resultShown.value = false
   errorMsg.value = ''
-
   uni.showToast({ title: '消息已销毁', icon: 'success' })
 }
-
-// 页面离开时自动销毁（返回首页时）
-onShow(() => {
-  // 如果已经解密过但用户离开了再回来，不清除
-  // 通过 onHide 处理销毁逻辑
-})
-
-// 监听页面隐藏 - 阅后即焚
-onHide(() => {
-  if (resultShown.value || errorMsg.value) {
-    // 用户离开页面时自动销毁解密结果
-    ciphertext.value = ''
-    decryptedText.value = ''
-    resultShown.value = false
-    errorMsg.value = ''
-  }
-})
 </script>
 
 <style lang="scss">
@@ -331,5 +382,25 @@ onHide(() => {
   color: #888;
   display: block;
   margin-bottom: 8rpx;
+}
+
+/* 隐私遮罩 */
+.privacy-cover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: #0D0D1A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.privacy-cover-text {
+  font-size: 28rpx;
+  color: #555;
+  letter-spacing: 4rpx;
 }
 </style>

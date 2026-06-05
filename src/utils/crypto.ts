@@ -20,6 +20,46 @@ const DEFAULT_KEY = 'pv-secret-d27654c2ec86daaa38d5547e9c4255c6'
 const EXP_PREFIX = '__EXP__'
 const EXPIRY_MS = 10 * 60 * 1000
 
+// 已消费密文存储 key
+const CONSUMED_SET_KEY = 'consumed-ciphertexts'
+// 用于生成密文指纹的前缀长度
+const FINGERPRINT_LEN = 64
+
+/**
+ * 从密文生成唯一指纹（取前 64 字符，足以区分不同密文）
+ */
+function fingerprint(ciphertext: string): string {
+  return ciphertext.slice(0, Math.min(FINGERPRINT_LEN, ciphertext.length))
+}
+
+/**
+ * 检查密文是否已被消费（不可重复解密）
+ */
+function isConsumed(ciphertext: string): boolean {
+  try {
+    const set: string[] = uni.getStorageSync(CONSUMED_SET_KEY) || []
+    return set.includes(fingerprint(ciphertext))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 标记密文为已消费
+ */
+function markConsumed(ciphertext: string) {
+  try {
+    const set: string[] = uni.getStorageSync(CONSUMED_SET_KEY) || []
+    const fp = fingerprint(ciphertext)
+    if (!set.includes(fp)) {
+      set.push(fp)
+      uni.setStorageSync(CONSUMED_SET_KEY, set)
+    }
+  } catch (e) {
+    console.warn('[Crypto] 标记已消费失败:', e)
+  }
+}
+
 /**
  * 加密文本（含10分钟有效期）
  */
@@ -42,6 +82,13 @@ export function encrypt(text: string, key?: string): string {
 export function decrypt(ciphertext: string, key?: string): string {
   try {
     const secretKey = key || DEFAULT_KEY
+
+    // 检查是否已被消费（已解密过）
+    if (isConsumed(ciphertext)) {
+      console.warn('[Crypto] 密文已被消费，不可重复解密')
+      return ''
+    }
+
     const bytes = CryptoJS.AES.decrypt(ciphertext, secretKey)
     const result = bytes.toString(CryptoJS.enc.Utf8)
     if (!result) return ''
@@ -56,12 +103,15 @@ export function decrypt(ciphertext: string, key?: string): string {
           console.warn('[Crypto] 密文已过期')
           return ''
         }
+        // 标记为已消费（仅解密一次）
+        markConsumed(ciphertext)
         // 未过期，返回原文
         return rest.slice(sepIdx + 2)
       }
     }
 
-    // 没有时间戳标记（旧版密文），直接返回
+    // 没有时间戳标记（旧版密文），也标记为已消费
+    markConsumed(ciphertext)
     return result
   } catch (e) {
     console.error('[Crypto] 解密失败:', e)

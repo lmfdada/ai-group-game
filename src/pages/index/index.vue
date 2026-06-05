@@ -26,9 +26,19 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 
 const expression = ref('')
 const result = ref('0')
+
+// 从分享卡片携带的密文参数（需要先时间验证，再跳转解密页）
+const pendingCiphertext = ref('')
+
+onLoad((query) => {
+  if (query?.c) {
+    pendingCiphertext.value = query.c
+  }
+})
 const currentInput = ref('0')
 const operator = ref('')
 const prevValue = ref<number | null>(null)
@@ -167,7 +177,11 @@ function calculate() {
       result.value = '欢迎回来'
       justCalculated.value = true
       setTimeout(() => {
-        uni.reLaunch({ url: '/pages/home/index' })
+        if (pendingCiphertext.value) {
+          uni.reLaunch({ url: '/pages/decrypt/index?c=' + pendingCiphertext.value })
+        } else {
+          uni.reLaunch({ url: '/pages/home/index' })
+        }
       }, 400)
       return
     }
@@ -208,7 +222,11 @@ function calculate() {
     result.value = '欢迎回来'
     justCalculated.value = true
     setTimeout(() => {
-      uni.reLaunch({ url: '/pages/home/index' })
+      if (pendingCiphertext.value) {
+        uni.reLaunch({ url: '/pages/decrypt/index?c=' + pendingCiphertext.value })
+      } else {
+        uni.reLaunch({ url: '/pages/home/index' })
+      }
     }, 400)
   }
 }

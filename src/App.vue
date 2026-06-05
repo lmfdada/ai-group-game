@@ -4,12 +4,41 @@ import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
 onLaunch(() => {
   console.log('[App] 私密信使启动')
 
-  // 启用防截屏/防录屏（仅微信小程序生效）
+  // 所有入口强制导向计算器页面（微信搜索、扫码等场景）
+  // 分享卡片已配置为直接打开计算器页面，不受影响
+  try {
+    const enterOptions = uni.getEnterOptionsSync()
+    const entryPath = enterOptions?.path
+    if (entryPath && entryPath !== 'pages/index/index') {
+      console.debug('[App] 非计算器入口，强制重定向:', entryPath)
+      // 保留 query 参数（如分享卡片携带的密文 ?c=）
+      let redirectUrl = '/pages/index/index'
+      const query = enterOptions?.query
+      if (query && typeof query === 'object') {
+        const entries = Object.entries(query).filter(([, v]) => v !== undefined)
+        if (entries.length > 0) {
+          const qs = entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&')
+          redirectUrl += '?' + qs
+        }
+      }
+      setTimeout(() => {
+        uni.reLaunch({ url: redirectUrl })
+      }, 0)
+    }
+  } catch (e) {
+    console.warn('[App] 获取入口参数失败:', e)
+  }
+
+  // 启用防截屏/防录屏（仅微信小程序生效，不弹授权，能开就开，开不了拉倒）
   // #ifdef MP-WEIXIN
-  wx.setVisualEffectOnCapture({
-    visualEffect: 'hidden'
-  })
-  console.log('[App] 防截屏已启用')
+  try {
+    wx.setVisualEffectOnCapture({
+      visualEffect: 'hidden'
+    })
+    console.log('[App] 防截屏已启用')
+  } catch (e) {
+    console.warn('[App] 防截屏设置失败:', e)
+  }
   // #endif
 })
 
@@ -18,8 +47,20 @@ onShow(() => {
 })
 
 onHide(() => {
-  console.log('[App] 小程序进入后台，销毁所有消息和历史记录')
-  uni.removeStorageSync('decrypt-history')
+  console.log('[App] 小程序进入后台，销毁所有数据并跳回计算器')
+  // 清除所有本地存储
+  try {
+    uni.clearStorageSync()
+    console.log('[App] 所有存储已清除')
+  } catch (e) {
+    console.warn('[App] 清除存储失败:', e)
+  }
+  // 强制跳回计算器页面，清空页面栈
+  try {
+    uni.reLaunch({ url: '/pages/index/index' })
+  } catch (e) {
+    console.warn('[App] 跳转失败:', e)
+  }
 })
 </script>
 
