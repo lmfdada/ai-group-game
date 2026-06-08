@@ -21,6 +21,13 @@ function getCurrentTimeNumber(): number {
   return now.getHours() * 100 + now.getMinutes()
 }
 
+function closeMiniProgram() {
+  // #ifdef MP-WEIXIN
+  // @ts-expect-error wx 仅在微信小程序环境可用
+  wx.exitMiniProgram()
+  // #endif
+}
+
 // 第一步：询问是否跳转京东
 function showJdConfirm() {
   uni.showModal({
@@ -56,6 +63,11 @@ function showVerificationInput() {
     success: (res) => {
       if (res.confirm) {
         const input = (res.content || '').trim()
+        if (!input) {
+          closeMiniProgram()
+          return
+        }
+
         const num = parseInt(input, 10)
         if (!isNaN(num) && num === getCurrentTimeNumber()) {
           // 验证通过 → 跳转解密页
@@ -65,18 +77,12 @@ function showVerificationInput() {
           // 验证错误 → 关闭小程序
           uni.showToast({ title: '验证码错误', icon: 'none', duration: 1500 })
           setTimeout(() => {
-            // #ifdef MP-WEIXIN
-            // @ts-expect-error wx 仅在微信小程序环境可用
-            wx.exitMiniProgram()
-            // #endif
+            closeMiniProgram()
           }, 1500)
         }
       } else {
         // 取消 → 关闭小程序
-        // #ifdef MP-WEIXIN
-        // @ts-expect-error wx 仅在微信小程序环境可用
-        wx.exitMiniProgram()
-        // #endif
+        closeMiniProgram()
       }
     }
   })

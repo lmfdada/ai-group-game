@@ -51,7 +51,7 @@
       <text class="tips-title">🔒 安全提示</text>
       <text class="tips-item">• 解密在本地完成，不会上传到任何服务器</text>
       <text class="tips-item">• 关闭本页后消息自动销毁</text>
-      <text class="tips-item">• 如需重新查看，请让好友重新发送密文</text>
+      <text class="tips-item">• 密文生成后 10 分钟内可解密查看</text>
     </view>
 
     <!-- 隐私遮罩：切到后台时覆盖内容，防止 app switcher 截图 -->
