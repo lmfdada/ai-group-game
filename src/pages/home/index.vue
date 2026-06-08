@@ -61,6 +61,10 @@
     <view class="footer-tip">
       <text class="tip-text">请通过微信等加密渠道分享密文和密钥</text>
     </view>
+
+    <view v-if="showPrivacyCover" class="privacy-cover">
+      <text class="privacy-cover-text">保护隐私</text>
+    </view>
   </view>
 </template>
 
@@ -74,6 +78,7 @@ interface HistoryItem {
 }
 
 const history = ref<HistoryItem[]>([])
+const showPrivacyCover = ref(false)
 
 // 10秒无操作自动跳回计算器
 let timerId: ReturnType<typeof setTimeout> | null = null
@@ -94,12 +99,18 @@ function stopTimer() {
 
 onShow(() => {
   resetTimer()
+  setTimeout(() => {
+    showPrivacyCover.value = false
+  }, 120)
   const saved = uni.getStorageSync('decrypt-history')
   if (saved) {
     history.value = saved
   }
 })
-onHide(() => stopTimer())
+onHide(() => {
+  stopTimer()
+  showPrivacyCover.value = true
+})
 onUnload(() => stopTimer())
 
 function handleEncrypt() {
@@ -141,6 +152,24 @@ function handleClearHistory() {
   padding: 32rpx;
   padding-bottom: 120rpx;
   background: #0F0F1A;
+}
+
+.privacy-cover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: #0D0D1A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.privacy-cover-text {
+  font-size: 28rpx;
+  color: #555;
 }
 
 .header {

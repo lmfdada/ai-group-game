@@ -58,6 +58,10 @@
         <text class="tips-key" user-select>{{ keyPreview }}</text>
       </text>
     </view>
+
+    <view v-if="showPrivacyCover" class="privacy-cover">
+      <text class="privacy-cover-text">保护隐私</text>
+    </view>
   </view>
 </template>
 
@@ -68,6 +72,7 @@ import { encrypt, getKeyPreview } from '@/utils/crypto'
 
 const plaintext = ref('')
 const ciphertext = ref('')
+const showPrivacyCover = ref(false)
 const keyPreview = computed(() => getKeyPreview())
 
 // 10秒无操作自动跳回计算器
@@ -87,8 +92,16 @@ function stopTimer() {
   }
 }
 
-onShow(() => resetTimer())
-onHide(() => stopTimer())
+onShow(() => {
+  resetTimer()
+  setTimeout(() => {
+    showPrivacyCover.value = false
+  }, 120)
+})
+onHide(() => {
+  stopTimer()
+  showPrivacyCover.value = true
+})
 onUnload(() => stopTimer())
 
 watch(plaintext, () => resetTimer())
@@ -157,6 +170,24 @@ function handleCopy() {
 .page {
   min-height: 100vh;
   padding: 32rpx;
+}
+
+.privacy-cover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: #0D0D1A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.privacy-cover-text {
+  font-size: 28rpx;
+  color: #555;
 }
 
 .card {

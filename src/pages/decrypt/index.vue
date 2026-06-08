@@ -103,8 +103,10 @@ const screenshotHandler = () => {
 
 onShow(() => {
   resetTimer()
-  // 回到前台时隐藏隐私遮罩
-  showPrivacyCover.value = false
+  // 回到前台时短暂保留遮罩，等待分享路由或全局跳转完成。
+  setTimeout(() => {
+    showPrivacyCover.value = false
+  }, 120)
   // 注册截图监听：检测到截图就销毁消息
   try {
     uni.onUserCaptureScreen(screenshotHandler)
