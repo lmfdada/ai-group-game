@@ -30,16 +30,7 @@
         <text class="result-label">秘密内容</text>
         <text class="result-badge result-badge-warn">阅后即焚</text>
       </view>
-      <view v-if="decryptedImageSrc" class="image-result-body">
-        <image
-          class="decrypted-image"
-          :src="decryptedImageSrc"
-          mode="aspectFit"
-          :show-menu-by-longpress="false"
-        />
-        <text v-if="decryptedText" class="image-caption">{{ decryptedText }}</text>
-      </view>
-      <view v-else class="result-body">
+      <view class="result-body">
         <text class="result-text" selectable>{{ decryptedText }}</text>
       </view>
       <view class="result-actions">
@@ -87,7 +78,6 @@ import { decrypt } from '@/utils/crypto'
 
 const ciphertext = ref('')
 const decryptedText = ref('')
-const decryptedImageSrc = ref('')
 const resultShown = ref(false)
 const errorMsg = ref('')
 const showScrambleCover = ref(false)
@@ -119,7 +109,6 @@ const screenshotHandler = () => {
     showScrambleCover.value = true
     ciphertext.value = ''
     decryptedText.value = ''
-    decryptedImageSrc.value = ''
     resultShown.value = false
     errorMsg.value = ''
     setTimeout(() => {
@@ -155,7 +144,6 @@ onHide(() => {
   if (resultShown.value || errorMsg.value) {
     ciphertext.value = ''
     decryptedText.value = ''
-    decryptedImageSrc.value = ''
     resultShown.value = false
     errorMsg.value = ''
   }
@@ -188,25 +176,6 @@ onLoad((query) => {
 
 watch(ciphertext, () => resetTimer())
 
-function parseDecryptedPayload(text: string) {
-  try {
-    const payload = JSON.parse(text)
-    if (payload?.pvType === 'image' && typeof payload.dataUrl === 'string') {
-      return {
-        type: 'image',
-        dataUrl: payload.dataUrl,
-        text: typeof payload.text === 'string' ? payload.text : ''
-      }
-    }
-  } catch {
-    // 旧版纯文本密文会走这里
-  }
-  return {
-    type: 'text',
-    text
-  }
-}
-
 // 保存解密记录到本地存储
 function saveToHistory(text: string) {
   const saved = uni.getStorageSync('decrypt-history') || []
@@ -224,7 +193,6 @@ function handleDecrypt() {
 
   errorMsg.value = ''
   resultShown.value = false
-  decryptedImageSrc.value = ''
 
   uni.showLoading({ title: '解密中...' })
   try {
@@ -232,16 +200,9 @@ function handleDecrypt() {
     uni.hideLoading()
 
     if (plaintext) {
-      const payload = parseDecryptedPayload(plaintext)
-      if (payload.type === 'image') {
-        decryptedImageSrc.value = payload.dataUrl || ''
-        decryptedText.value = payload.text || ''
-        saveToHistory(payload.text ? `[图片] ${payload.text}` : '[图片]')
-      } else {
-        decryptedText.value = payload.text || ''
-        saveToHistory(payload.text || '')
-      }
+      decryptedText.value = plaintext
       resultShown.value = true
+      saveToHistory(plaintext)
       uni.showToast({ title: '解密成功', icon: 'success' })
     } else {
       errorMsg.value = '解密失败：密钥错误或密文已损坏'
@@ -256,7 +217,6 @@ function handleBurn() {
   // 清空所有内容，实现阅后即焚
   ciphertext.value = ''
   decryptedText.value = ''
-  decryptedImageSrc.value = ''
   resultShown.value = false
   errorMsg.value = ''
   uni.showToast({ title: '消息已销毁', icon: 'success' })
@@ -369,29 +329,6 @@ function handleBurn() {
   border-radius: 12rpx;
   padding: 20rpx;
   margin-bottom: 20rpx;
-}
-
-.image-result-body {
-  background: #0F0F1A;
-  border-radius: 12rpx;
-  padding: 16rpx;
-  margin-bottom: 20rpx;
-}
-
-.decrypted-image {
-  width: 100%;
-  height: 640rpx;
-  pointer-events: none;
-  user-select: none;
-}
-
-.image-caption {
-  color: #CFCFCF;
-  font-size: 26rpx;
-  line-height: 1.6;
-  display: block;
-  margin-top: 16rpx;
-  word-break: break-all;
 }
 
 .result-text {
