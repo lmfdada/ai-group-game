@@ -67,6 +67,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onHide, onLoad, onShow, onUnload } from '@dcloudio/uni-app'
+import { decodeCiphertextParam, encodeCiphertextParam } from '@/utils/ciphertext-param'
 
 const expression = ref('')
 const result = ref('0')
@@ -93,7 +94,7 @@ function openShareGate() {
 
 function captureCiphertextFromQuery(query?: Record<string, any>) {
   if (query?.c) {
-    const nextCiphertext = String(query.c)
+    const nextCiphertext = decodeCiphertextParam(String(query.c))
     if (nextCiphertext !== pendingCiphertext.value) {
       gatedCiphertext.value = ''
     }
@@ -109,7 +110,7 @@ function captureCiphertextFromEnterOptions() {
   try {
     const enterOptions = uni.getEnterOptionsSync()
     if (enterOptions?.query?.c) {
-      const nextCiphertext = String(enterOptions.query.c)
+      const nextCiphertext = decodeCiphertextParam(String(enterOptions.query.c))
       if (nextCiphertext !== pendingCiphertext.value) {
         gatedCiphertext.value = ''
         pendingCiphertext.value = nextCiphertext
@@ -123,7 +124,7 @@ function captureCiphertextFromEnterOptions() {
 }
 
 function getDecryptUrl() {
-  return '/pages/decrypt/index?c=' + encodeURIComponent(pendingCiphertext.value)
+  return '/pages/decrypt/index?c=' + encodeCiphertextParam(pendingCiphertext.value)
 }
 
 function blockSharedDecrypt() {

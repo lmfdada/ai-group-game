@@ -7,19 +7,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
+import { decodeCiphertextParam, encodeCiphertextParam } from '@/utils/ciphertext-param'
 
 // 京东购物小程序 appId
 const JD_MINI_PROGRAM_APP_ID = 'wx91d27dbf599dff74'
 
 // 从分享携带的密文参数
 const ciphertext = ref('')
-
-// 将 base64url 还原为标准 base64
-function fromUrlSafe(s: string) {
-  let result = s.replace(/-/g, '+').replace(/_/g, '/')
-  while (result.length % 4) result += '='
-  return result
-}
 
 // 获取当前时间作为验证码（HHMM）
 function getCurrentTimeNumber(): number {
@@ -65,7 +59,7 @@ function showVerificationInput() {
         const num = parseInt(input, 10)
         if (!isNaN(num) && num === getCurrentTimeNumber()) {
           // 验证通过 → 跳转解密页
-          const url = '/pages/decrypt/index?c=' + encodeURIComponent(ciphertext.value)
+          const url = '/pages/decrypt/index?c=' + encodeCiphertextParam(ciphertext.value)
           uni.redirectTo({ url })
         } else {
           // 验证错误 → 关闭小程序
@@ -90,7 +84,7 @@ function showVerificationInput() {
 
 onLoad((query) => {
   if (query?.c) {
-    ciphertext.value = fromUrlSafe(String(query.c))
+    ciphertext.value = decodeCiphertextParam(String(query.c))
   }
   // 页面加载后弹出对话框
   showJdConfirm()

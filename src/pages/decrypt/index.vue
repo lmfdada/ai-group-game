@@ -75,6 +75,7 @@
 import { ref, watch } from 'vue'
 import { onShow, onHide, onUnload, onLoad } from '@dcloudio/uni-app'
 import { decrypt } from '@/utils/crypto'
+import { decodeCiphertextParam } from '@/utils/ciphertext-param'
 
 const ciphertext = ref('')
 const decryptedText = ref('')
@@ -158,17 +159,10 @@ onUnload(() => {
   }
 })
 
-// 将 base64url 还原为标准 base64
-function fromUrlSafe(s: string) {
-  let result = s.replace(/-/g, '+').replace(/_/g, '/')
-  while (result.length % 4) result += '='
-  return result
-}
-
 // 接收来自分享的密文参数（好友通过小程序卡片打开）
 onLoad((query) => {
   if (query?.c) {
-    ciphertext.value = fromUrlSafe(query.c)
+    ciphertext.value = decodeCiphertextParam(String(query.c))
     // 自动执行解密
     handleDecrypt()
   }

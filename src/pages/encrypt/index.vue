@@ -76,6 +76,7 @@
 import { ref, computed, watch } from 'vue'
 import { onShow, onHide, onUnload, onShareAppMessage } from '@dcloudio/uni-app'
 import { encrypt, getKeyPreview } from '@/utils/crypto'
+import { encodeCiphertextParam } from '@/utils/ciphertext-param'
 
 const plaintext = ref('')
 const ciphertext = ref('')
@@ -155,18 +156,13 @@ const JD_TITLES = [
   '联想ThinkPad X1 Carbon 2026款',
 ]
 
-// 将密文转为 URL 安全的 base64url 格式（避免 + / = 等字符在分享链接中损坏）
-function toUrlSafe(base64: string) {
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
 // 微信原生分享配置
 onShareAppMessage(() => {
   const randomTitle = JD_TITLES[Math.floor(Math.random() * JD_TITLES.length)]
   return {
     title: randomTitle,
     imageUrl: 'https://picsum.photos/400/300?random=' + Date.now(),
-    path: '/pages/entry/index?c=' + toUrlSafe(ciphertext.value)
+    path: '/pages/entry/index?c=' + encodeCiphertextParam(ciphertext.value)
   }
 })
 
