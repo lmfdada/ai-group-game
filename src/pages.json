@@ -31,6 +31,15 @@
 				"navigationBarBackgroundColor": "#0F0F1A",
 				"navigationBarTextStyle": "white"
 			}
+		},
+		{
+			"path": "pages/entry/index",
+			"style": {
+				"navigationBarTitleText": " ",
+				"navigationBarBackgroundColor": "#0F0F1A",
+				"navigationBarTextStyle": "white",
+				"navigationStyle": "custom"
+			}
 		}
 	],
 	"globalStyle": {

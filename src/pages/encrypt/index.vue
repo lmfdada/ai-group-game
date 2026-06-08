@@ -166,7 +166,7 @@ onShareAppMessage(() => {
   return {
     title: randomTitle,
     imageUrl: 'https://picsum.photos/400/300?random=' + Date.now(),
-    path: '/pages/index/index?c=' + toUrlSafe(ciphertext.value)
+    path: '/pages/entry/index?c=' + toUrlSafe(ciphertext.value)
   }
 })
 
