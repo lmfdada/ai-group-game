@@ -22,10 +22,19 @@ function getCurrentTimeNumber(): number {
 }
 
 function closeMiniProgram() {
+  setTimeout(() => {
   // #ifdef MP-WEIXIN
   // @ts-expect-error wx 仅在微信小程序环境可用
-  wx.exitMiniProgram()
+    wx.exitMiniProgram({
+      fail: () => {
+        uni.reLaunch({ url: '/pages/index/index' })
+      }
+    })
   // #endif
+  // #ifndef MP-WEIXIN
+    uni.reLaunch({ url: '/pages/index/index' })
+  // #endif
+  }, 80)
 }
 
 // 第一步：询问是否跳转京东
