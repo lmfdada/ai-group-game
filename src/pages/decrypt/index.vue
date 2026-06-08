@@ -73,7 +73,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { onShow, onHide, onUnload, onLoad } from '@dcloudio/uni-app'
+import { onShow, onHide, onUnload, onLoad, onBackPress } from '@dcloudio/uni-app'
 import { decrypt } from '@/utils/crypto'
 import { decodeCiphertextParam } from '@/utils/ciphertext-param'
 
@@ -83,6 +83,7 @@ const resultShown = ref(false)
 const errorMsg = ref('')
 const showScrambleCover = ref(false)
 const scrambleBlocks = Array.from({ length: 96 }, (_, index) => index)
+const isShareEntry = ref(false)
 
 // 隐私遮罩：切到后台时覆盖内容
 const showPrivacyCover = ref(false)
@@ -162,10 +163,18 @@ onUnload(() => {
 // 接收来自分享的密文参数（好友通过小程序卡片打开）
 onLoad((query) => {
   if (query?.c) {
+    isShareEntry.value = query?.from === 'share'
     ciphertext.value = decodeCiphertextParam(String(query.c))
     // 自动执行解密
     handleDecrypt()
   }
+})
+
+onBackPress(() => {
+  if (!isShareEntry.value) return false
+
+  uni.reLaunch({ url: '/pages/index/index' })
+  return true
 })
 
 watch(ciphertext, () => resetTimer())

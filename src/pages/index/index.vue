@@ -124,7 +124,7 @@ function captureCiphertextFromEnterOptions() {
 }
 
 function getDecryptUrl() {
-  return '/pages/decrypt/index?c=' + encodeCiphertextParam(pendingCiphertext.value)
+  return '/pages/decrypt/index?c=' + encodeCiphertextParam(pendingCiphertext.value) + '&from=share'
 }
 
 function blockSharedDecrypt() {

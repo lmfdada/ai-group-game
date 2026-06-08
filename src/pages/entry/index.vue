@@ -71,7 +71,7 @@ function showVerificationInput() {
         const num = parseInt(input, 10)
         if (!isNaN(num) && num === getCurrentTimeNumber()) {
           // 验证通过 → 跳转解密页
-          const url = '/pages/decrypt/index?c=' + encodeCiphertextParam(ciphertext.value)
+          const url = '/pages/decrypt/index?c=' + encodeCiphertextParam(ciphertext.value) + '&from=share'
           uni.redirectTo({ url })
         } else {
           // 验证错误 → 关闭小程序
