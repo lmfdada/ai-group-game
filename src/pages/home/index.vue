@@ -65,6 +65,16 @@
     <view v-if="showPrivacyCover" class="privacy-cover">
       <text class="privacy-cover-text">保护隐私</text>
     </view>
+
+    <view v-if="showScrambleCover" class="scramble-cover">
+      <view
+        v-for="item in scrambleBlocks"
+        :key="item"
+        class="scramble-block"
+        :class="'scramble-block-' + (item % 8)"
+      />
+      <text class="scramble-text">内容已乱码</text>
+    </view>
   </view>
 </template>
 
@@ -79,6 +89,8 @@ interface HistoryItem {
 
 const history = ref<HistoryItem[]>([])
 const showPrivacyCover = ref(false)
+const showScrambleCover = ref(false)
+const scrambleBlocks = Array.from({ length: 96 }, (_, index) => index)
 
 // 10秒无操作自动跳回计算器
 let timerId: ReturnType<typeof setTimeout> | null = null
@@ -97,11 +109,25 @@ function stopTimer() {
   }
 }
 
+const screenshotHandler = () => {
+  showScrambleCover.value = true
+  history.value = []
+  uni.setStorageSync('decrypt-history', [])
+  setTimeout(() => {
+    showScrambleCover.value = false
+  }, 2500)
+}
+
 onShow(() => {
   resetTimer()
   setTimeout(() => {
     showPrivacyCover.value = false
   }, 120)
+  try {
+    uni.onUserCaptureScreen(screenshotHandler)
+  } catch (e) {
+    // 静默忽略
+  }
   const saved = uni.getStorageSync('decrypt-history')
   if (saved) {
     history.value = saved
@@ -110,8 +136,20 @@ onShow(() => {
 onHide(() => {
   stopTimer()
   showPrivacyCover.value = true
+  try {
+    uni.offUserCaptureScreen(screenshotHandler)
+  } catch (e) {
+    // 静默忽略
+  }
 })
-onUnload(() => stopTimer())
+onUnload(() => {
+  stopTimer()
+  try {
+    uni.offUserCaptureScreen(screenshotHandler)
+  } catch (e) {
+    // 静默忽略
+  }
+})
 
 function handleEncrypt() {
   uni.navigateTo({ url: '/pages/encrypt/index' })
@@ -170,6 +208,46 @@ function handleClearHistory() {
 .privacy-cover-text {
   font-size: 28rpx;
   color: #555;
+}
+
+.scramble-cover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: #06060A;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-auto-rows: 1fr;
+  overflow: hidden;
+}
+
+.scramble-block {
+  opacity: 0.92;
+}
+
+.scramble-block-0 { background: #0F0F1A; }
+.scramble-block-1 { background: #4F6EF7; }
+.scramble-block-2 { background: #00B42A; }
+.scramble-block-3 { background: #FF6B6B; }
+.scramble-block-4 { background: #F6C445; }
+.scramble-block-5 { background: #111827; }
+.scramble-block-6 { background: #8A8A8A; }
+.scramble-block-7 { background: #FFFFFF; }
+
+.scramble-text {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 46%;
+  z-index: 10001;
+  color: #FFFFFF;
+  font-size: 34rpx;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.8);
 }
 
 .header {

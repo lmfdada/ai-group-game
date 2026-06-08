@@ -14,11 +14,25 @@
       <text class="card-counter">{{ plaintext.length }}/2000</text>
     </view>
 
+    <view class="card">
+      <view class="image-header">
+        <text class="card-label">秘密图片</text>
+        <button v-if="imageDataUrl" class="btn-clear-image" @tap="clearImage">移除</button>
+      </view>
+      <view v-if="imageDataUrl" class="image-preview-wrap">
+        <image class="image-preview" :src="imageDataUrl" mode="aspectFit" />
+      </view>
+      <button v-else class="btn-secondary" @tap="chooseSecretImage">
+        <text class="btn-secondary-text">选择图片</text>
+      </button>
+      <text class="card-hint">图片会先转成密文，解密后只在本机展示</text>
+    </view>
+
     <!-- 加密按钮 -->
     <button
       class="btn-primary"
-      :disabled="!plaintext.trim()"
-      :class="{ 'btn-disabled': !plaintext.trim() }"
+      :disabled="!canEncrypt"
+      :class="{ 'btn-disabled': !canEncrypt }"
       @tap="handleEncrypt"
     >
       <text class="btn-text">🔐 加密生成密文</text>
@@ -30,19 +44,19 @@
         <text class="result-label">密文（已加密）</text>
         <text class="result-badge">AES-256</text>
       </view>
-      <view class="result-body">
+      <scroll-view class="result-body" scroll-y>
         <text class="result-text" selectable>{{ ciphertext }}</text>
-      </view>
+      </scroll-view>
       <view class="result-actions">
-        <button class="btn-copy" @tap="handleCopy">
-          <text class="btn-copy-text">📋 复制密文</text>
-        </button>
-        <button class="btn-share" open-type="share">
+        <button v-if="canShareCiphertext" class="btn-share" open-type="share">
           <text class="btn-share-text">💬 发送给好友</text>
+        </button>
+        <button v-else class="btn-share btn-share-disabled" disabled>
+          <text class="btn-share-text">密文过大，暂不可分享</text>
         </button>
       </view>
       <view class="result-tip">
-        <text class="tip-text">⚠️ 将上方密文和密钥一起发给好友</text>
+        <text class="tip-text">{{ resultTip }}</text>
       </view>
     </view>
 
@@ -62,6 +76,16 @@
     <view v-if="showPrivacyCover" class="privacy-cover">
       <text class="privacy-cover-text">保护隐私</text>
     </view>
+
+    <view v-if="showScrambleCover" class="scramble-cover">
+      <view
+        v-for="item in scrambleBlocks"
+        :key="item"
+        class="scramble-block"
+        :class="'scramble-block-' + (item % 8)"
+      />
+      <text class="scramble-text">内容已乱码</text>
+    </view>
   </view>
 </template>
 
@@ -70,10 +94,22 @@ import { ref, computed, watch } from 'vue'
 import { onShow, onHide, onUnload, onShareAppMessage } from '@dcloudio/uni-app'
 import { encrypt, getKeyPreview } from '@/utils/crypto'
 
+const MAX_SHARE_CIPHER_LENGTH = 1800
+
 const plaintext = ref('')
 const ciphertext = ref('')
+const imageDataUrl = ref('')
+const imageMime = ref('image/jpeg')
 const showPrivacyCover = ref(false)
+const showScrambleCover = ref(false)
+const scrambleBlocks = Array.from({ length: 96 }, (_, index) => index)
 const keyPreview = computed(() => getKeyPreview())
+const canEncrypt = computed(() => Boolean(plaintext.value.trim() || imageDataUrl.value))
+const canShareCiphertext = computed(() => Boolean(ciphertext.value && toUrlSafe(ciphertext.value).length <= MAX_SHARE_CIPHER_LENGTH))
+const resultTip = computed(() => {
+  if (canShareCiphertext.value) return '⚠️ 将密钥通过安全渠道告诉好友'
+  return '⚠️ 图片密文通常很长，当前分享链路无法可靠承载，需要接入云端中转后分享'
+})
 
 // 10秒无操作自动跳回计算器
 let timerId: ReturnType<typeof setTimeout> | null = null
@@ -92,19 +128,47 @@ function stopTimer() {
   }
 }
 
+const screenshotHandler = () => {
+  showScrambleCover.value = true
+  plaintext.value = ''
+  ciphertext.value = ''
+  imageDataUrl.value = ''
+  setTimeout(() => {
+    showScrambleCover.value = false
+  }, 2500)
+}
+
 onShow(() => {
   resetTimer()
   setTimeout(() => {
     showPrivacyCover.value = false
   }, 120)
+  try {
+    uni.onUserCaptureScreen(screenshotHandler)
+  } catch (e) {
+    // 静默忽略
+  }
 })
 onHide(() => {
   stopTimer()
   showPrivacyCover.value = true
+  try {
+    uni.offUserCaptureScreen(screenshotHandler)
+  } catch (e) {
+    // 静默忽略
+  }
 })
-onUnload(() => stopTimer())
+onUnload(() => {
+  stopTimer()
+  try {
+    uni.offUserCaptureScreen(screenshotHandler)
+  } catch (e) {
+    // 静默忽略
+  }
+})
 
 watch(plaintext, () => resetTimer())
+watch(imageDataUrl, () => resetTimer())
 
 // 京东商品风格的随机标题（混淆视听，避免暴露暗门）
 const JD_TITLES = [
@@ -128,19 +192,92 @@ function toUrlSafe(base64: string) {
 // 微信原生分享配置
 onShareAppMessage(() => {
   const randomTitle = JD_TITLES[Math.floor(Math.random() * JD_TITLES.length)]
+  const safeCiphertext = toUrlSafe(ciphertext.value)
+  if (!safeCiphertext || safeCiphertext.length > MAX_SHARE_CIPHER_LENGTH) {
+    uni.showToast({ title: '密文过大，暂不可分享', icon: 'none' })
+    return {
+      title: randomTitle,
+      imageUrl: 'https://picsum.photos/400/300?random=' + Date.now(),
+      path: '/pages/index/index'
+    }
+  }
   return {
     title: randomTitle,
     imageUrl: 'https://picsum.photos/400/300?random=' + Date.now(),
-    path: '/pages/index/index?c=' + toUrlSafe(ciphertext.value)
+    path: '/pages/index/index?c=' + safeCiphertext
   }
 })
 
+function getMimeFromPath(path: string) {
+  const lower = path.toLowerCase()
+  if (lower.endsWith('.png')) return 'image/png'
+  if (lower.endsWith('.webp')) return 'image/webp'
+  if (lower.endsWith('.gif')) return 'image/gif'
+  return 'image/jpeg'
+}
+
+function readFileAsDataUrl(filePath: string, mime: string) {
+  return new Promise<string>((resolve, reject) => {
+    // #ifdef MP-WEIXIN
+    const fs = uni.getFileSystemManager()
+    fs.readFile({
+      filePath,
+      encoding: 'base64',
+      success: (res: any) => resolve(`data:${mime};base64,${res.data}`),
+      fail: reject
+    })
+    // #endif
+    // #ifndef MP-WEIXIN
+    reject(new Error('当前平台暂不支持读取图片文件'))
+    // #endif
+  })
+}
+
+function chooseSecretImage() {
+  resetTimer()
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: ['album', 'camera'],
+    success: async (res: any) => {
+      const filePath = res.tempFilePaths?.[0]
+      if (!filePath) return
+      const mime = getMimeFromPath(filePath)
+      uni.showLoading({ title: '读取图片...' })
+      try {
+        imageMime.value = mime
+        imageDataUrl.value = await readFileAsDataUrl(filePath, mime)
+        uni.hideLoading()
+      } catch (e: any) {
+        uni.hideLoading()
+        uni.showModal({
+          title: '读取失败',
+          content: e?.message || '图片读取失败，请换一张图片重试',
+          showCancel: false
+        })
+      }
+    }
+  })
+}
+
+function clearImage() {
+  imageDataUrl.value = ''
+}
+
 function handleEncrypt() {
-  if (!plaintext.value.trim()) return
+  if (!canEncrypt.value) return
 
   uni.showLoading({ title: '加密中...' })
   try {
-    ciphertext.value = encrypt(plaintext.value)
+    const payload = imageDataUrl.value
+      ? JSON.stringify({
+          pvType: 'image',
+          mime: imageMime.value,
+          dataUrl: imageDataUrl.value,
+          text: plaintext.value.trim()
+        })
+      : plaintext.value
+    ciphertext.value = encrypt(payload)
     uni.hideLoading()
     uni.showToast({ title: '加密成功', icon: 'success' })
   } catch (e: any) {
@@ -152,16 +289,6 @@ function handleEncrypt() {
       showCancel: false
     })
   }
-}
-
-function handleCopy() {
-  if (!ciphertext.value) return
-  uni.setClipboardData({
-    data: ciphertext.value,
-    success: () => {
-      uni.showToast({ title: '密文已复制', icon: 'success' })
-    }
-  })
 }
 
 </script>
@@ -190,6 +317,46 @@ function handleCopy() {
   color: #555;
 }
 
+.scramble-cover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: #06060A;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-auto-rows: 1fr;
+  overflow: hidden;
+}
+
+.scramble-block {
+  opacity: 0.92;
+}
+
+.scramble-block-0 { background: #0F0F1A; }
+.scramble-block-1 { background: #4F6EF7; }
+.scramble-block-2 { background: #00B42A; }
+.scramble-block-3 { background: #FF6B6B; }
+.scramble-block-4 { background: #F6C445; }
+.scramble-block-5 { background: #111827; }
+.scramble-block-6 { background: #8A8A8A; }
+.scramble-block-7 { background: #FFFFFF; }
+
+.scramble-text {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 46%;
+  z-index: 10001;
+  color: #FFFFFF;
+  font-size: 34rpx;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.8);
+}
+
 .card {
   background: #1A1A2E;
   border: 1px solid #2A2A3E;
@@ -213,6 +380,60 @@ function handleCopy() {
   color: #E0E0E0;
   line-height: 1.6;
   box-sizing: border-box;
+}
+
+.card-hint {
+  font-size: 22rpx;
+  color: #666680;
+  display: block;
+  margin-top: 12rpx;
+}
+
+.image-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.btn-clear-image {
+  width: 120rpx;
+  height: 52rpx;
+  line-height: 52rpx;
+  margin: 0;
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.25);
+  border-radius: 10rpx;
+  color: #FF8A8A;
+  font-size: 22rpx;
+}
+
+.btn-secondary {
+  width: 100%;
+  height: 80rpx;
+  line-height: 80rpx;
+  margin: 0;
+  background: rgba(79, 110, 247, 0.12);
+  border: 1px solid rgba(79, 110, 247, 0.28);
+  border-radius: 12rpx;
+}
+
+.btn-secondary-text {
+  color: #AFC0FF;
+  font-size: 26rpx;
+}
+
+.image-preview-wrap {
+  height: 320rpx;
+  background: #0F0F1A;
+  border-radius: 12rpx;
+  overflow: hidden;
+}
+
+.image-preview {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .placeholder {
@@ -282,6 +503,8 @@ function handleCopy() {
   border-radius: 12rpx;
   padding: 20rpx;
   margin-bottom: 20rpx;
+  height: 260rpx;
+  box-sizing: border-box;
 }
 
 .result-text {
@@ -298,24 +521,21 @@ function handleCopy() {
   gap: 16rpx;
 }
 
-.btn-copy, .btn-share {
+.btn-share {
   flex: 1;
   height: 72rpx;
   line-height: 72rpx;
   border-radius: 36rpx;
   text-align: center;
   border: none;
-}
-
-.btn-copy {
-  background: #4F6EF7;
-}
-
-.btn-share {
   background: #00B42A;
 }
 
-.btn-copy-text, .btn-share-text {
+.btn-share-disabled {
+  opacity: 0.45;
+}
+
+.btn-share-text {
   color: #FFFFFF;
   font-size: 26rpx;
 }

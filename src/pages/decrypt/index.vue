@@ -30,7 +30,16 @@
         <text class="result-label">秘密内容</text>
         <text class="result-badge result-badge-warn">阅后即焚</text>
       </view>
-      <view class="result-body">
+      <view v-if="decryptedImageSrc" class="image-result-body">
+        <image
+          class="decrypted-image"
+          :src="decryptedImageSrc"
+          mode="aspectFit"
+          :show-menu-by-longpress="false"
+        />
+        <text v-if="decryptedText" class="image-caption">{{ decryptedText }}</text>
+      </view>
+      <view v-else class="result-body">
         <text class="result-text" selectable>{{ decryptedText }}</text>
       </view>
       <view class="result-actions">
@@ -58,6 +67,16 @@
     <view v-if="showPrivacyCover" class="privacy-cover">
       <text class="privacy-cover-text">离开即焚 · 保护隐私</text>
     </view>
+
+    <view v-if="showScrambleCover" class="scramble-cover">
+      <view
+        v-for="item in scrambleBlocks"
+        :key="item"
+        class="scramble-block"
+        :class="'scramble-block-' + (item % 8)"
+      />
+      <text class="scramble-text">内容已乱码</text>
+    </view>
   </view>
 </template>
 
@@ -68,8 +87,11 @@ import { decrypt } from '@/utils/crypto'
 
 const ciphertext = ref('')
 const decryptedText = ref('')
+const decryptedImageSrc = ref('')
 const resultShown = ref(false)
 const errorMsg = ref('')
+const showScrambleCover = ref(false)
+const scrambleBlocks = Array.from({ length: 96 }, (_, index) => index)
 
 // 隐私遮罩：切到后台时覆盖内容
 const showPrivacyCover = ref(false)
@@ -94,10 +116,15 @@ function stopTimer() {
 // 截图销毁回调（保存引用以便移除监听）
 const screenshotHandler = () => {
   if (resultShown.value || errorMsg.value) {
+    showScrambleCover.value = true
     ciphertext.value = ''
     decryptedText.value = ''
+    decryptedImageSrc.value = ''
     resultShown.value = false
     errorMsg.value = ''
+    setTimeout(() => {
+      showScrambleCover.value = false
+    }, 2500)
   }
 }
 
@@ -128,6 +155,7 @@ onHide(() => {
   if (resultShown.value || errorMsg.value) {
     ciphertext.value = ''
     decryptedText.value = ''
+    decryptedImageSrc.value = ''
     resultShown.value = false
     errorMsg.value = ''
   }
@@ -160,6 +188,25 @@ onLoad((query) => {
 
 watch(ciphertext, () => resetTimer())
 
+function parseDecryptedPayload(text: string) {
+  try {
+    const payload = JSON.parse(text)
+    if (payload?.pvType === 'image' && typeof payload.dataUrl === 'string') {
+      return {
+        type: 'image',
+        dataUrl: payload.dataUrl,
+        text: typeof payload.text === 'string' ? payload.text : ''
+      }
+    }
+  } catch {
+    // 旧版纯文本密文会走这里
+  }
+  return {
+    type: 'text',
+    text
+  }
+}
+
 // 保存解密记录到本地存储
 function saveToHistory(text: string) {
   const saved = uni.getStorageSync('decrypt-history') || []
@@ -177,6 +224,7 @@ function handleDecrypt() {
 
   errorMsg.value = ''
   resultShown.value = false
+  decryptedImageSrc.value = ''
 
   uni.showLoading({ title: '解密中...' })
   try {
@@ -184,9 +232,16 @@ function handleDecrypt() {
     uni.hideLoading()
 
     if (plaintext) {
-      decryptedText.value = plaintext
+      const payload = parseDecryptedPayload(plaintext)
+      if (payload.type === 'image') {
+        decryptedImageSrc.value = payload.dataUrl || ''
+        decryptedText.value = payload.text || ''
+        saveToHistory(payload.text ? `[图片] ${payload.text}` : '[图片]')
+      } else {
+        decryptedText.value = payload.text || ''
+        saveToHistory(payload.text || '')
+      }
       resultShown.value = true
-      saveToHistory(plaintext)
       uni.showToast({ title: '解密成功', icon: 'success' })
     } else {
       errorMsg.value = '解密失败：密钥错误或密文已损坏'
@@ -201,6 +256,7 @@ function handleBurn() {
   // 清空所有内容，实现阅后即焚
   ciphertext.value = ''
   decryptedText.value = ''
+  decryptedImageSrc.value = ''
   resultShown.value = false
   errorMsg.value = ''
   uni.showToast({ title: '消息已销毁', icon: 'success' })
@@ -315,6 +371,29 @@ function handleBurn() {
   margin-bottom: 20rpx;
 }
 
+.image-result-body {
+  background: #0F0F1A;
+  border-radius: 12rpx;
+  padding: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.decrypted-image {
+  width: 100%;
+  height: 640rpx;
+  pointer-events: none;
+  user-select: none;
+}
+
+.image-caption {
+  color: #CFCFCF;
+  font-size: 26rpx;
+  line-height: 1.6;
+  display: block;
+  margin-top: 16rpx;
+  word-break: break-all;
+}
+
 .result-text {
   font-size: 28rpx;
   color: #E0E0E0;
@@ -404,5 +483,45 @@ function handleBurn() {
   font-size: 28rpx;
   color: #555;
   letter-spacing: 4rpx;
+}
+
+.scramble-cover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: #06060A;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-auto-rows: 1fr;
+  overflow: hidden;
+}
+
+.scramble-block {
+  opacity: 0.92;
+}
+
+.scramble-block-0 { background: #0F0F1A; }
+.scramble-block-1 { background: #4F6EF7; }
+.scramble-block-2 { background: #00B42A; }
+.scramble-block-3 { background: #FF6B6B; }
+.scramble-block-4 { background: #F6C445; }
+.scramble-block-5 { background: #111827; }
+.scramble-block-6 { background: #8A8A8A; }
+.scramble-block-7 { background: #FFFFFF; }
+
+.scramble-text {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 46%;
+  z-index: 10001;
+  color: #FFFFFF;
+  font-size: 34rpx;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.8);
 }
 </style>
