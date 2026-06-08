@@ -527,8 +527,8 @@ function formatNumber(str: string): string {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 9000;
-  background: rgba(0, 0, 0, 0.58);
+  z-index: 11000;
+  background: #F5F5F5;
   display: flex;
   align-items: center;
   justify-content: center;
