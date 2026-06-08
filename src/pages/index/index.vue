@@ -26,7 +26,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 
 const expression = ref('')
 const result = ref('0')
@@ -34,27 +34,46 @@ const result = ref('0')
 // 从分享卡片携带的密文参数（需要先时间验证，再跳转解密页）
 const pendingCiphertext = ref('')
 
-onLoad((query) => {
-  // 从路由参数获取密文
+function captureCiphertextFromQuery(query?: Record<string, any>) {
   if (query?.c) {
-    pendingCiphertext.value = query.c
+    pendingCiphertext.value = String(query.c)
     console.debug('[calc] 从路由参数获取密文')
+    return true
   }
-  // 兜底：从入口参数获取（某些场景路由参数可能为空）
-  if (!pendingCiphertext.value) {
-    try {
-      const enterOptions = uni.getEnterOptionsSync()
-      if (enterOptions?.query?.c) {
-        pendingCiphertext.value = enterOptions.query.c as string
+  return false
+}
+
+function captureCiphertextFromEnterOptions() {
+  try {
+    const enterOptions = uni.getEnterOptionsSync()
+    if (enterOptions?.query?.c) {
+      const nextCiphertext = String(enterOptions.query.c)
+      if (nextCiphertext !== pendingCiphertext.value) {
+        pendingCiphertext.value = nextCiphertext
         console.debug('[calc] 从入口参数获取密文')
       }
-    } catch (e) {
-      // 静默
     }
+  } catch (e) {
+    // 静默
   }
+}
+
+function getDecryptUrl() {
+  return '/pages/decrypt/index?c=' + encodeURIComponent(pendingCiphertext.value)
+}
+
+onLoad((query) => {
+  // 从路由参数获取密文；热启动分享场景下，再从入口参数兜底获取。
+  captureCiphertextFromQuery(query)
+  captureCiphertextFromEnterOptions()
   if (pendingCiphertext.value) {
     console.debug('[calc] 已捕获密文参数，等待时间验证')
   }
+})
+
+onShow(() => {
+  // 小程序从分享卡片热启动时，页面可能不会重新 onLoad。
+  captureCiphertextFromEnterOptions()
 })
 const currentInput = ref('0')
 const operator = ref('')
@@ -195,7 +214,7 @@ function calculate() {
       justCalculated.value = true
       setTimeout(() => {
         if (pendingCiphertext.value) {
-          uni.reLaunch({ url: '/pages/decrypt/index?c=' + pendingCiphertext.value })
+          uni.reLaunch({ url: getDecryptUrl() })
         } else {
           uni.reLaunch({ url: '/pages/home/index' })
         }
@@ -240,7 +259,7 @@ function calculate() {
     justCalculated.value = true
     setTimeout(() => {
       if (pendingCiphertext.value) {
-        uni.reLaunch({ url: '/pages/decrypt/index?c=' + pendingCiphertext.value })
+        uni.reLaunch({ url: getDecryptUrl() })
       } else {
         uni.reLaunch({ url: '/pages/home/index' })
       }

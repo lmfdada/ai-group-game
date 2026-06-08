@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
 
+let shouldReturnToCalculator = false
+
 onLaunch(() => {
   console.log('[App] 私密信使启动')
 
@@ -17,24 +19,27 @@ onLaunch(() => {
   // #endif
 })
 
-onShow(() => {
+onShow((options: any) => {
   console.log('[App] 小程序进入前台')
+  const hasSharedCiphertext = Boolean(options?.query?.c)
+  if (hasSharedCiphertext) {
+    shouldReturnToCalculator = false
+  }
+  if (shouldReturnToCalculator && !hasSharedCiphertext) {
+    shouldReturnToCalculator = false
+    uni.reLaunch({ url: '/pages/index/index' })
+  }
 })
 
 onHide(() => {
-  console.log('[App] 小程序进入后台，销毁所有数据并跳回计算器')
+  console.log('[App] 小程序进入后台，销毁所有数据')
+  shouldReturnToCalculator = true
   // 清除所有本地存储
   try {
     uni.clearStorageSync()
     console.log('[App] 所有存储已清除')
   } catch (e) {
     console.warn('[App] 清除存储失败:', e)
-  }
-  // 强制跳回计算器页面，清空页面栈
-  try {
-    uni.reLaunch({ url: '/pages/index/index' })
-  } catch (e) {
-    console.warn('[App] 跳转失败:', e)
   }
 })
 </script>
