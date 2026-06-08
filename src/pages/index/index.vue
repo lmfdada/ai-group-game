@@ -22,6 +22,36 @@
       </view>
     </view>
 
+    <view v-if="showShareConfirm || showTimePrompt" class="gate-mask">
+      <view class="gate-dialog">
+        <view v-if="showShareConfirm">
+          <text class="gate-title">是否打开京东</text>
+          <text class="gate-desc">即将离开当前小程序，前往京东查看商品详情。</text>
+          <view class="gate-actions">
+            <button class="gate-btn gate-btn-secondary" @tap="handleRejectJd">否</button>
+            <button class="gate-btn gate-btn-primary" @tap="handleOpenJd">是</button>
+          </view>
+        </view>
+
+        <view v-else>
+          <text class="gate-title">请输入验证码</text>
+          <input
+            class="gate-input"
+            v-model="gateInput"
+            type="number"
+            maxlength="4"
+            password
+            focus
+            @confirm="submitGateInput"
+          />
+          <view class="gate-actions">
+            <button class="gate-btn gate-btn-secondary" @tap="cancelGateInput">取消</button>
+            <button class="gate-btn gate-btn-primary" @tap="submitGateInput">确认</button>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <view v-if="showScrambleCover" class="scramble-cover">
       <view
         v-for="item in scrambleBlocks"
@@ -42,14 +72,34 @@ const expression = ref('')
 const result = ref('0')
 const showScrambleCover = ref(false)
 const scrambleBlocks = Array.from({ length: 96 }, (_, index) => index)
+const showShareConfirm = ref(false)
+const showTimePrompt = ref(false)
+const gateInput = ref('')
+const gatedCiphertext = ref('')
+
+// 京东购物小程序 appId。如目标小程序调整，只需要改这里。
+const JD_MINI_PROGRAM_APP_ID = 'wx91d27dbf599dff74'
 
 // 从分享卡片携带的密文参数（需要先时间验证，再跳转解密页）
 const pendingCiphertext = ref('')
 
+function openShareGate() {
+  if (!pendingCiphertext.value || gatedCiphertext.value === pendingCiphertext.value) return
+  gatedCiphertext.value = pendingCiphertext.value
+  gateInput.value = ''
+  showTimePrompt.value = false
+  showShareConfirm.value = true
+}
+
 function captureCiphertextFromQuery(query?: Record<string, any>) {
   if (query?.c) {
-    pendingCiphertext.value = String(query.c)
+    const nextCiphertext = String(query.c)
+    if (nextCiphertext !== pendingCiphertext.value) {
+      gatedCiphertext.value = ''
+    }
+    pendingCiphertext.value = nextCiphertext
     console.debug('[calc] 从路由参数获取密文')
+    openShareGate()
     return true
   }
   return false
@@ -61,9 +111,11 @@ function captureCiphertextFromEnterOptions() {
     if (enterOptions?.query?.c) {
       const nextCiphertext = String(enterOptions.query.c)
       if (nextCiphertext !== pendingCiphertext.value) {
+        gatedCiphertext.value = ''
         pendingCiphertext.value = nextCiphertext
         console.debug('[calc] 从入口参数获取密文')
       }
+      openShareGate()
     }
   } catch (e) {
     // 静默
@@ -72,6 +124,60 @@ function captureCiphertextFromEnterOptions() {
 
 function getDecryptUrl() {
   return '/pages/decrypt/index?c=' + encodeURIComponent(pendingCiphertext.value)
+}
+
+function blockSharedDecrypt() {
+  pendingCiphertext.value = ''
+  showShareConfirm.value = false
+  showTimePrompt.value = false
+  gateInput.value = ''
+  clear()
+}
+
+function handleOpenJd() {
+  blockSharedDecrypt()
+  uni.navigateToMiniProgram({
+    appId: JD_MINI_PROGRAM_APP_ID,
+    fail: () => {
+      uni.showToast({ title: '暂时无法打开京东', icon: 'none' })
+    }
+  })
+}
+
+function handleRejectJd() {
+  showShareConfirm.value = false
+  showTimePrompt.value = true
+  gateInput.value = ''
+}
+
+function cancelGateInput() {
+  blockSharedDecrypt()
+}
+
+function exitToWechat() {
+  blockSharedDecrypt()
+  // #ifdef MP-WEIXIN
+  wx.exitMiniProgram({
+    fail: () => {
+      uni.reLaunch({ url: '/pages/index/index' })
+    }
+  })
+  // #endif
+  // #ifndef MP-WEIXIN
+  uni.reLaunch({ url: '/pages/index/index' })
+  // #endif
+}
+
+function submitGateInput() {
+  const input = gateInput.value.trim()
+  if (checkTimeUnlock(input) && pendingCiphertext.value) {
+    showShareConfirm.value = false
+    showTimePrompt.value = false
+    gateInput.value = ''
+    uni.reLaunch({ url: getDecryptUrl() })
+    return
+  }
+  exitToWechat()
 }
 
 onLoad((query) => {
@@ -413,6 +519,89 @@ function formatNumber(str: string): string {
 .btn--blank {
   background: transparent;
   pointer-events: none;
+}
+
+.gate-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9000;
+  background: rgba(0, 0, 0, 0.58);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+
+.gate-dialog {
+  width: 100%;
+  max-width: 620rpx;
+  background: #FFFFFF;
+  border-radius: 18rpx;
+  padding: 44rpx 36rpx 32rpx;
+  box-sizing: border-box;
+  box-shadow: 0 20rpx 70rpx rgba(0, 0, 0, 0.34);
+}
+
+.gate-title {
+  display: block;
+  color: #111111;
+  font-size: 34rpx;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  margin-bottom: 18rpx;
+}
+
+.gate-desc {
+  display: block;
+  color: #666666;
+  font-size: 27rpx;
+  line-height: 1.55;
+  text-align: center;
+  margin-bottom: 34rpx;
+}
+
+.gate-input {
+  height: 88rpx;
+  line-height: 88rpx;
+  margin: 10rpx 0 34rpx;
+  padding: 0 24rpx;
+  border: 1px solid #DDDDDD;
+  border-radius: 12rpx;
+  background: #F7F7F7;
+  color: #111111;
+  font-size: 32rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.gate-actions {
+  display: flex;
+  gap: 20rpx;
+}
+
+.gate-btn {
+  flex: 1;
+  height: 78rpx;
+  line-height: 78rpx;
+  margin: 0;
+  border-radius: 10rpx;
+  font-size: 29rpx;
+  border: none;
+}
+
+.gate-btn-secondary {
+  background: #F1F1F1;
+  color: #333333;
+}
+
+.gate-btn-primary {
+  background: #E1251B;
+  color: #FFFFFF;
 }
 
 .scramble-cover {
